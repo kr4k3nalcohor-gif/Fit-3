@@ -1,0 +1,6 @@
+{
+  "name": "PulseFit - Metrónomo Háptico Galaxy Fit 3",
+  "description": "Metrónomo deportivo de alta precisión con 3 controles principales, compatibilidad con tarjetas Samsung Galaxy Fit 3, gestos táctiles en muñeca y vibración háptica personalizable para entrenamiento.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
