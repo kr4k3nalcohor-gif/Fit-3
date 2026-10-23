@@ -45,6 +45,7 @@ export const ApkInstallerModal: React.FC<ApkInstallerModalProps> = ({
   const [isGeneratingZip, setIsGeneratingZip] = useState(false);
 
   const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
+  const publicUrl = currentUrl.replace('ais-dev-', 'ais-pre-') || 'https://ais-pre-2fcb7fno6obrqgos3u6lav-562928299395.us-west2.run.app';
 
   useEffect(() => {
     // Detect if inside an iframe
@@ -54,9 +55,9 @@ export const ApkInstallerModal: React.FC<ApkInstallerModalProps> = ({
       setIsInIframe(true);
     }
 
-    // Generate QR Code
-    if (currentUrl) {
-      QRCode.toDataURL(currentUrl, {
+    // Generate QR Code with public URL for seamless mobile access
+    if (publicUrl) {
+      QRCode.toDataURL(publicUrl, {
         width: 260,
         margin: 2,
         color: {
@@ -67,13 +68,13 @@ export const ApkInstallerModal: React.FC<ApkInstallerModalProps> = ({
         .then((url) => setQrDataUrl(url))
         .catch(() => {});
     }
-  }, [currentUrl]);
+  }, [publicUrl]);
 
   if (!isOpen) return null;
 
   const handleCopyUrl = async () => {
     try {
-      await navigator.clipboard.writeText(currentUrl);
+      await navigator.clipboard.writeText(publicUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     } catch {
@@ -82,7 +83,7 @@ export const ApkInstallerModal: React.FC<ApkInstallerModalProps> = ({
   };
 
   const handleOpenDirect = () => {
-    window.open(currentUrl, '_blank');
+    window.open(publicUrl, '_blank');
   };
 
   const handleDownloadAndroidProject = async () => {
