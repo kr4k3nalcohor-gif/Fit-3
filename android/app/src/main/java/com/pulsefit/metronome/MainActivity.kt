@@ -106,7 +106,9 @@ fun PulseFitNativeApp(
         onDispose {
             try {
                 context.unregisterReceiver(receiver)
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                // Ignore
+            }
         }
     }
 

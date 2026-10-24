@@ -421,7 +421,7 @@ fun PulseFitNativeApp(
             context.registerReceiver(receiver, filter)
         }
         onDispose {
-            try { context.unregisterReceiver(receiver) } catch (_: Exception) {}
+            try { context.unregisterReceiver(receiver) } catch (e: Exception) {}
         }
     }
 
@@ -628,14 +628,14 @@ class MetronomeService : Service() {
                 .build()
 
             audioTrack?.play()
-        } catch (_: Exception) {}
+        } catch (e: Exception) {}
     }
 
     private fun playBeatAudio(isAccent: Boolean) {
         try {
             val buffer = if (isAccent) accentPcm else regularPcm
             audioTrack?.write(buffer, 0, buffer.size)
-        } catch (_: Exception) {}
+        } catch (e: Exception) {}
     }
 
     private fun initMediaSession() {
@@ -773,7 +773,7 @@ class MetronomeService : Service() {
         try {
             audioTrack?.stop()
             audioTrack?.release()
-        } catch (_: Exception) {}
+        } catch (e: Exception) {}
         audioTrack = null
         mediaSession?.release()
     }
