@@ -386,6 +386,15 @@ export const ApkInstallerModal: React.FC<ApkInstallerModalProps> = ({
               </p>
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 <a
+                  href="https://github.com/kr4k3nalcohor-gif/Fit-3/actions/runs/40106911652"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="py-2 px-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold rounded-xl shadow-md shadow-emerald-500/20 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Descargar APK Compilado (Run #3)</span>
+                </a>
+                <a
                   href="https://github.com/kr4k3nalcohor-gif/Fit-3"
                   target="_blank"
                   rel="noreferrer"
@@ -398,22 +407,51 @@ export const ApkInstallerModal: React.FC<ApkInstallerModalProps> = ({
                   href="https://github.com/kr4k3nalcohor-gif/Fit-3/actions"
                   target="_blank"
                   rel="noreferrer"
-                  className="py-2 px-3 bg-slate-900 hover:bg-slate-850 text-emerald-400 font-bold rounded-xl border border-slate-750 flex items-center gap-1.5 cursor-pointer"
+                  className="py-2 px-3 bg-slate-900 hover:bg-slate-850 text-slate-300 font-bold rounded-xl border border-slate-750 flex items-center gap-1.5 cursor-pointer"
                 >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Ver GitHub Actions (APKs)</span>
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Historial Actions</span>
                 </a>
               </div>
+            </div>
+
+            {/* Instruction on how to install the APK from GitHub Actions artifact */}
+            <div className="bg-emerald-950/40 border border-emerald-500/40 rounded-2xl p-4 flex flex-col gap-2.5">
+              <span className="font-bold text-emerald-300 text-xs uppercase tracking-wider flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4" />
+                <span>Cómo instalar el APK descargado en tu teléfono Samsung / Android:</span>
+              </span>
+              <div className="space-y-2 text-xs text-slate-300">
+                <div className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center shrink-0 text-[11px] font-mono-numbers">1</span>
+                  <span>Descarga el artefacto <strong>PulseFit-debug-apk</strong> desde GitHub Actions en tu móvil. (Se descarga como un archivo comprimido <code>.zip</code> de ~15 MB).</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center shrink-0 text-[11px] font-mono-numbers">2</span>
+                  <span>Abre la aplicación <strong>Mis archivos</strong> (o Gestor de Archivos) en tu Samsung y ve a la carpeta <strong>Descargas</strong>.</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center shrink-0 text-[11px] font-mono-numbers">3</span>
+                  <span>Toca el archivo descargado y pulsa <strong>Extraer</strong>. Verás el instalador <strong><code>app-debug.apk</code></strong>.</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center shrink-0 text-[11px] font-mono-numbers">4</span>
+                  <span>Toca <strong><code>app-debug.apk</code></strong> y selecciona <strong>Instalar</strong>. Si Android pide permiso para instalar fuentes desconocidas, concédeselo una sola vez.</span>
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-400 pt-1 border-t border-emerald-500/20">
+                ⚠️ <strong>Nota clave:</strong> El APK se instala en tu <strong>teléfono</strong>. La pulsera <strong>Galaxy Fit 3</strong> no instala APKs internos (usa FreeRTOS): se sincroniza por Bluetooth con el teléfono y muestra la carátula y los botones en la tarjeta <em>Controlador multimedia</em>.
+              </p>
             </div>
 
             {/* Download Full Android Project ZIP */}
             <div className="bg-indigo-950/50 border border-indigo-500/40 rounded-2xl p-4 flex flex-col gap-3">
               <div className="flex items-center gap-2 text-indigo-300 font-bold uppercase tracking-wider text-xs">
                 <FolderArchive className="w-4 h-4" />
-                <span>Proyecto Nativo Android (Gradle + Kotlin Compose)</span>
+                <span>Código Fuente Nativo Completo (ZIP)</span>
               </div>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Descarga el proyecto completo con Gradle 8.10, SDK 35, `MainActivity.kt` (Jetpack Compose), `MetronomeService.kt` y el workflow de GitHub Actions listo para compilar.
+                Descarga el código fuente de Android Studio (Gradle 8.10, SDK 35, Jetpack Compose, `MetronomeService.kt` con vibración y sincronización Fit 3).
               </p>
 
               <button

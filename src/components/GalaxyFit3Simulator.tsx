@@ -312,11 +312,17 @@ export const GalaxyFit3Simulator: React.FC<GalaxyFit3SimulatorProps> = ({
               type="button"
               onClick={handleTestVibration}
               className="px-2.5 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 active:scale-95 text-rose-300 border border-rose-500/40 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer transition-all"
-              title="Probar pulso vibratorio en la muñeca"
+              title="Probar pulso vibratorio en la muñeca (No vibra el móvil)"
             >
               <Sparkles className="w-3.5 h-3.5" />
               <span>Probar</span>
             </button>
+          </div>
+
+          {/* User rule notice: Sound on phone, vibration on Fit 3 */}
+          <div className="text-[10px] bg-slate-950/80 rounded-lg p-2 border border-slate-800 text-slate-300 flex items-center justify-between">
+            <span className="text-emerald-400 font-bold">🔊 Móvil: Sonido metrónomo</span>
+            <span className="text-rose-400 font-bold">📳 Fit 3: Vibración muñeca</span>
           </div>
 
           {/* Intensity selector buttons */}

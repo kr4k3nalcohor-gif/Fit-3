@@ -1,12 +1,13 @@
 package com.pulsefit.metronome
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -18,18 +19,17 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -40,12 +40,13 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             PulseFitNativeApp(
-                onStartService = { bpm, beats, vibrationMs ->
+                onStartService = { bpm, beats, vibrationMs, vibratePhone ->
                     val intent = Intent(this, MetronomeService::class.java).apply {
                         action = MetronomeService.ACTION_START
                         putExtra(MetronomeService.EXTRA_BPM, bpm)
                         putExtra(MetronomeService.EXTRA_BEATS, beats)
                         putExtra(MetronomeService.EXTRA_VIBRATION_MS, vibrationMs)
+                        putExtra(MetronomeService.EXTRA_VIBRATE_PHONE, vibratePhone)
                     }
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         startForegroundService(intent)
@@ -73,16 +74,41 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun PulseFitNativeApp(
-    onStartService: (bpm: Int, beats: Int, vibrationMs: Long) -> Unit,
+    onStartService: (bpm: Int, beats: Int, vibrationMs: Long, vibratePhone: Boolean) -> Unit,
     onStopService: () -> Unit,
     onUpdateBpm: (bpm: Int) -> Unit
 ) {
-    var isPlaying by remember { mutableStateOf(false) }
-    var bpm by remember { mutableStateOf(160) }
+    val context = LocalContext.current
+    var isPlaying by remember { mutableStateOf(MetronomeService.isServiceRunning) }
+    var bpm by remember { mutableStateOf(MetronomeService.currentBpm) }
     var beats by remember { mutableStateOf(4) }
     var vibrationMs by remember { mutableStateOf(85L) }
+    var vibratePhone by remember { mutableStateOf(false) } // Default: False (Fit 3 vibrates, NOT the phone!)
     var showTempoDialog by remember { mutableStateOf(false) }
     var showBeatsDialog by remember { mutableStateOf(false) }
+
+    // Listen to broadcast updates from MetronomeService (e.g. when user changes BPM on Galaxy Fit 3 Media Controller!)
+    DisposableEffect(Unit) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                if (intent?.action == MetronomeService.ACTION_BPM_UPDATED) {
+                    val updatedBpm = intent.getIntExtra(MetronomeService.EXTRA_BPM, bpm)
+                    bpm = updatedBpm
+                }
+            }
+        }
+        val filter = IntentFilter(MetronomeService.ACTION_BPM_UPDATED)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            context.registerReceiver(receiver, filter)
+        }
+        onDispose {
+            try {
+                context.unregisterReceiver(receiver)
+            } catch (_: Exception) {}
+        }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -104,9 +130,9 @@ fun PulseFitNativeApp(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "PulseFit APK",
+                    text = "PulseFit",
                     color = Color.White,
-                    fontSize = 22.sp,
+                    fontSize = 24.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -118,19 +144,19 @@ fun PulseFitNativeApp(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Samsung Fit 3 Sync",
-                        color = Color(0xFF94A3B8),
+                        text = "Fit 3 Sincronizado",
+                        color = Color(0xFF38BDF8),
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
 
-            // Visual BPM Status Ring
+            // Visual BPM Status Ring (Updates live when Fit 3 triggers +/- 5 BPM!)
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(200.dp)
+                    .size(210.dp)
                     .clip(CircleShape)
                     .background(
                         if (isPlaying) Color(0x33F43F5E) else Color(0xFF0F172A)
@@ -139,21 +165,60 @@ fun PulseFitNativeApp(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = "$bpm",
-                        fontSize = 58.sp,
+                        fontSize = 64.sp,
                         fontWeight = FontWeight.Black,
                         color = Color.White,
                         fontFamily = FontFamily.Monospace
                     )
                     Text(
-                        text = "BPM · CADENCIA",
+                        text = "BPM · EN RITMO",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF38BDF8)
                     )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Controlable ±5 desde Fit 3",
+                        fontSize = 10.sp,
+                        color = Color(0xFF94A3B8)
+                    )
                 }
             }
 
-            // --- THE 3 REQUESTED BUTTONS ---
+            // Mode indicator banner
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A))
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.VolumeUp,
+                        contentDescription = null,
+                        tint = Color(0xFF34D399),
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = "Sonido en móvil · Vibración en Fit 3",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "El teléfono suena como metrónomo. La pulsera vibra en la muñeca.",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+            }
+
+            // --- THE 3 CORE BUTTONS ---
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -163,7 +228,7 @@ fun PulseFitNativeApp(
                     onClick = {
                         isPlaying = !isPlaying
                         if (isPlaying) {
-                            onStartService(bpm, beats, vibrationMs)
+                            onStartService(bpm, beats, vibrationMs, vibratePhone)
                         } else {
                             onStopService()
                         }

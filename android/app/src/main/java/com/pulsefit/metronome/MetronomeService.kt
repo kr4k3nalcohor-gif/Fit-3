@@ -8,7 +8,8 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
-import android.media.SoundPool
+import android.media.AudioFormat
+import android.media.AudioTrack
 import android.os.Build
 import android.os.IBinder
 import android.os.VibrationEffect
@@ -39,8 +40,14 @@ class MetronomeService : Service() {
     private var bpm = 160
     private var beatsPerMeasure = 4
     private var currentBeat = 0
-    private var vibrationMs = 85L // Running standard
+    private var vibrationMs = 85L
     private var accentFirstBeat = true
+    private var vibratePhone = false // User requested: ONLY Fit 3 vibrates, NOT the phone!
+
+    // Audio generation for phone metronome sound
+    private var audioTrack: AudioTrack? = null
+    private var accentPcm: ShortArray = ShortArray(0)
+    private var regularPcm: ShortArray = ShortArray(0)
 
     companion object {
         const val ACTION_START = "ACTION_START"
@@ -48,15 +55,21 @@ class MetronomeService : Service() {
         const val ACTION_SET_BPM = "ACTION_SET_BPM"
         const val ACTION_SET_BEATS = "ACTION_SET_BEATS"
         const val ACTION_SET_VIBRATION = "ACTION_SET_VIBRATION"
+        const val ACTION_BPM_UPDATED = "com.pulsefit.metronome.BPM_UPDATED"
 
         const val EXTRA_BPM = "EXTRA_BPM"
         const val EXTRA_BEATS = "EXTRA_BEATS"
         const val EXTRA_VIBRATION_MS = "EXTRA_VIBRATION_MS"
+        const val EXTRA_VIBRATE_PHONE = "EXTRA_VIBRATE_PHONE"
+
+        var currentBpm = 160
+        var isServiceRunning = false
     }
 
     override fun onCreate() {
         super.onCreate()
         initVibrator()
+        initAudioEngine()
         initMediaSession()
         createNotificationChannel()
     }
@@ -68,6 +81,67 @@ class MetronomeService : Service() {
         } else {
             @Suppress("DEPRECATION")
             getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+        }
+    }
+
+    private fun initAudioEngine() {
+        val sampleRate = 44100
+        val accentDuration = (0.040 * sampleRate).toInt()
+        val regularDuration = (0.025 * sampleRate).toInt()
+
+        accentPcm = ShortArray(accentDuration)
+        for (i in 0 until accentDuration) {
+            val t = i.toDouble() / sampleRate
+            val decay = kotlin.math.exp(-i.toDouble() / (sampleRate * 0.007))
+            val sample = (kotlin.math.sin(2.0 * Math.PI * 1200.0 * t) * decay * 32767.0 * 0.95).toInt()
+            accentPcm[i] = sample.coerceIn(-32768, 32767).toShort()
+        }
+
+        regularPcm = ShortArray(regularDuration)
+        for (i in 0 until regularDuration) {
+            val t = i.toDouble() / sampleRate
+            val decay = kotlin.math.exp(-i.toDouble() / (sampleRate * 0.006))
+            val sample = (kotlin.math.sin(2.0 * Math.PI * 820.0 * t) * decay * 32767.0 * 0.85).toInt()
+            regularPcm[i] = sample.coerceIn(-32768, 32767).toShort()
+        }
+
+        val bufferSize = AudioTrack.getMinBufferSize(
+            sampleRate,
+            AudioFormat.CHANNEL_OUT_MONO,
+            AudioFormat.ENCODING_PCM_16BIT
+        ).coerceAtLeast(accentDuration * 4)
+
+        try {
+            audioTrack = AudioTrack.Builder()
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build()
+                )
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .setSampleRate(sampleRate)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .build()
+                )
+                .setBufferSizeInBytes(bufferSize)
+                .setTransferMode(AudioTrack.MODE_STREAM)
+                .build()
+
+            audioTrack?.play()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun playBeatAudio(isAccent: Boolean) {
+        try {
+            val buffer = if (isAccent) accentPcm else regularPcm
+            audioTrack?.write(buffer, 0, buffer.size)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
@@ -93,6 +167,14 @@ class MetronomeService : Service() {
                     // Samsung Galaxy Fit 3 Previous Track button -> -5 BPM
                     setBpm(bpm - 5)
                 }
+
+                override fun onFastForward() {
+                    setBpm(bpm + 5)
+                }
+
+                override fun onRewind() {
+                    setBpm(bpm - 5)
+                }
             })
 
             isActive = true
@@ -103,8 +185,10 @@ class MetronomeService : Service() {
         when (intent?.action) {
             ACTION_START -> {
                 bpm = intent.getIntExtra(EXTRA_BPM, bpm)
+                currentBpm = bpm
                 beatsPerMeasure = intent.getIntExtra(EXTRA_BEATS, beatsPerMeasure)
                 vibrationMs = intent.getLongExtra(EXTRA_VIBRATION_MS, vibrationMs)
+                vibratePhone = intent.getBooleanExtra(EXTRA_VIBRATE_PHONE, false)
                 startMetronome()
             }
             ACTION_STOP -> stopMetronome()
@@ -119,6 +203,7 @@ class MetronomeService : Service() {
     private fun startMetronome() {
         if (isPlaying) return
         isPlaying = true
+        isServiceRunning = true
         currentBeat = 0
         updateNotification()
         updateMediaSession()
@@ -128,7 +213,16 @@ class MetronomeService : Service() {
         job = scope.launch {
             while (isActive && isPlaying) {
                 val intervalMs = (60_000.0 / bpm).toLong()
-                triggerHaptic(currentBeat)
+
+                // 1. Phone generates audio click (metronome sound)
+                val isAccent = currentBeat == 0
+                playBeatAudio(isAccent)
+
+                // 2. Only vibrate phone if explicitly requested (default: off)
+                if (vibratePhone) {
+                    triggerHaptic(currentBeat)
+                }
+
                 currentBeat = (currentBeat + 1) % beatsPerMeasure
                 updateMediaSession()
                 delay(intervalMs)
@@ -138,6 +232,7 @@ class MetronomeService : Service() {
 
     private fun stopMetronome() {
         isPlaying = false
+        isServiceRunning = false
         job?.cancel()
         job = null
         updateMediaSession()
@@ -147,15 +242,22 @@ class MetronomeService : Service() {
 
     private fun setBpm(newBpm: Int) {
         bpm = newBpm.coerceIn(30, 260)
+        currentBpm = bpm
         updateMediaSession()
         updateNotification()
+
+        // Broadcast to MainActivity so phone UI number updates immediately!
+        val broadcastIntent = Intent(ACTION_BPM_UPDATED).apply {
+            putExtra(EXTRA_BPM, bpm)
+            setPackage(packageName)
+        }
+        sendBroadcast(broadcastIntent)
     }
 
     private fun triggerHaptic(beat: Int) {
         val isFirst = beat == 0 && accentFirstBeat
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             if (isFirst) {
-                // Double burst for accent
                 val timings = longArrayOf(0, (vibrationMs * 1.3).toLong(), 35, (vibrationMs * 0.9).toLong())
                 val amplitudes = intArrayOf(0, 255, 0, 200)
                 vibrator?.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
@@ -177,7 +279,9 @@ class MetronomeService : Service() {
                     PlaybackStateCompat.ACTION_PAUSE or
                     PlaybackStateCompat.ACTION_PLAY_PAUSE or
                     PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
-                    PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
+                    PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
+                    PlaybackStateCompat.ACTION_FAST_FORWARD or
+                    PlaybackStateCompat.ACTION_REWIND
                 )
                 .setState(state, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 1.0f)
                 .build()
@@ -202,17 +306,12 @@ class MetronomeService : Service() {
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("PulseFit: $bpm BPM ($beatsPerMeasure/4)")
-            .setContentText(if (isPlaying) "Pulso háptico activo · Control en Galaxy Fit 3" else "En pausa")
+            .setContentText(if (isPlaying) "Sonido activo · Control desde Galaxy Fit 3" else "En pausa")
             .setSmallIcon(android.R.drawable.ic_lock_idle_charging)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
-    }
-
-    private fun updateNotification() {
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-        manager?.notify(NOTIF_ID, buildNotification())
     }
 
     private fun createNotificationChannel() {
@@ -222,7 +321,7 @@ class MetronomeService : Service() {
                 "PulseFit Metrónomo Servicio",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Mantiene el pulso háptico y sincronización con pulsera Galaxy Fit 3"
+                description = "Sonido de metrónomo y sincronización con pulsera Galaxy Fit 3"
             }
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
             manager?.createNotificationChannel(channel)
@@ -234,6 +333,13 @@ class MetronomeService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         stopMetronome()
+        try {
+            audioTrack?.stop()
+            audioTrack?.release()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        audioTrack = null
         mediaSession?.release()
     }
 }

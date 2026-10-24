@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Watch, 
   Vibrate, 
@@ -38,18 +38,40 @@ export default function App() {
   const [timeSignature, setTimeSignature] = useState<TimeSignature>(TIME_SIGNATURE_PRESETS[0]);
   const [currentBeat, setCurrentBeat] = useState<number>(0);
   const [soundType, setSoundType] = useState<SoundType>('woodblock');
-  const [volume, setVolume] = useState<number>(0.85);
-  const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
+  const [volume, setVolume] = useState<number>(1.0); // Maximum clear sound on phone
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(true); // Metronome sound on phone: Active!
 
-  // Haptic Configuration for Exercise & Samsung Galaxy Fit 3
+  // Haptic Configuration: ONLY Samsung Galaxy Fit 3 vibrates, NOT the phone!
   const [hapticConfig, setHapticConfig] = useState<HapticConfig>({
     intensity: 'high',
     accentFirstBeat: true,
-    vibrateOnPhone: true,
+    vibrateOnPhone: false, // User requested: Phone makes sound, Fit 3 vibrates!
     vibrateOnFit3: true,
     durationMs: 85,
     accentDurationMs: 120,
   });
+
+  // Mutable refs to prevent stale closure in MediaSession action handlers from Galaxy Fit 3
+  const bpmRef = useRef(bpm);
+  bpmRef.current = bpm;
+
+  const isPlayingRef = useRef(isPlaying);
+  isPlayingRef.current = isPlaying;
+
+  const timeSignatureRef = useRef(timeSignature);
+  timeSignatureRef.current = timeSignature;
+
+  const soundTypeRef = useRef(soundType);
+  soundTypeRef.current = soundType;
+
+  const volumeRef = useRef(volume);
+  volumeRef.current = volume;
+
+  const soundEnabledRef = useRef(soundEnabled);
+  soundEnabledRef.current = soundEnabled;
+
+  const currentBeatRef = useRef(currentBeat);
+  currentBeatRef.current = currentBeat;
 
   // Active view toggle on mobile: 'metronome' | 'fit3' | 'both'
   const [mobileTab, setMobileTab] = useState<'metronome' | 'fit3'>('metronome');
@@ -107,51 +129,82 @@ export default function App() {
   useEffect(() => {
     audioEngine.setBeatCallback((beatNumber) => {
       setCurrentBeat(beatNumber);
+      currentBeatRef.current = beatNumber;
       hapticsService.triggerHaptic(beatNumber, hapticConfig);
-      mediaSessionManager.update(bpm, timeSignature.beats, beatNumber, true);
+      mediaSessionManager.update(bpmRef.current, timeSignatureRef.current.beats, beatNumber, isPlayingRef.current);
     });
-  }, [bpm, timeSignature.beats, hapticConfig]);
+  }, [hapticConfig]);
 
   // Handle Play/Stop Toggle
   const handleTogglePlay = useCallback(() => {
-    if (isPlaying) {
+    if (isPlayingRef.current) {
       audioEngine.stop();
       setIsPlaying(false);
-      mediaSessionManager.update(bpm, timeSignature.beats, currentBeat, false);
+      isPlayingRef.current = false;
+      mediaSessionManager.update(bpmRef.current, timeSignatureRef.current.beats, currentBeatRef.current, false);
     } else {
-      audioEngine.start(bpm, timeSignature.beats, soundType, volume, soundEnabled);
+      audioEngine.start(
+        bpmRef.current,
+        timeSignatureRef.current.beats,
+        soundTypeRef.current,
+        volumeRef.current,
+        soundEnabledRef.current
+      );
       setIsPlaying(true);
-      mediaSessionManager.update(bpm, timeSignature.beats, 0, true);
-      // Immediate tactile touch confirmation
-      hapticsService.testHaptic('low');
+      isPlayingRef.current = true;
+      mediaSessionManager.update(bpmRef.current, timeSignatureRef.current.beats, 0, true);
     }
-  }, [isPlaying, bpm, timeSignature.beats, soundType, volume, soundEnabled, currentBeat]);
+  }, []);
 
-  // Adjust BPM
+  // Adjust BPM by step (e.g. +5 / -5 from Galaxy Fit 3 Media Controller buttons)
   const handleAdjustBpm = useCallback((delta: number) => {
     setBpm((prev) => {
       const next = Math.max(30, Math.min(260, prev + delta));
-      audioEngine.setParams(next, timeSignature.beats, soundType, volume, soundEnabled);
-      mediaSessionManager.update(next, timeSignature.beats, currentBeat, isPlaying);
+      bpmRef.current = next;
+      audioEngine.setParams(
+        next,
+        timeSignatureRef.current.beats,
+        soundTypeRef.current,
+        volumeRef.current,
+        soundEnabledRef.current
+      );
+      mediaSessionManager.update(
+        next,
+        timeSignatureRef.current.beats,
+        currentBeatRef.current,
+        isPlayingRef.current
+      );
       return next;
     });
-  }, [timeSignature.beats, soundType, volume, soundEnabled, currentBeat, isPlaying]);
+  }, []);
 
   const handleSetBpm = useCallback((newBpm: number) => {
     const clamped = Math.max(30, Math.min(260, newBpm));
     setBpm(clamped);
-    audioEngine.setParams(clamped, timeSignature.beats, soundType, volume, soundEnabled);
-    mediaSessionManager.update(clamped, timeSignature.beats, currentBeat, isPlaying);
-  }, [timeSignature.beats, soundType, volume, soundEnabled, currentBeat, isPlaying]);
+    bpmRef.current = clamped;
+    audioEngine.setParams(
+      clamped,
+      timeSignatureRef.current.beats,
+      soundTypeRef.current,
+      volumeRef.current,
+      soundEnabledRef.current
+    );
+    mediaSessionManager.update(
+      clamped,
+      timeSignatureRef.current.beats,
+      currentBeatRef.current,
+      isPlayingRef.current
+    );
+  }, []);
 
   // MediaSession setup for Samsung Galaxy Wearable and Fit 3 Media Tile
   useEffect(() => {
-    mediaSessionManager.setup({
+    const handlers = {
       onPlay: () => {
-        if (!isPlaying) handleTogglePlay();
+        if (!isPlayingRef.current) handleTogglePlay();
       },
       onPause: () => {
-        if (isPlaying) handleTogglePlay();
+        if (isPlayingRef.current) handleTogglePlay();
       },
       onNextTrack: () => {
         handleAdjustBpm(5);
@@ -159,8 +212,11 @@ export default function App() {
       onPreviousTrack: () => {
         handleAdjustBpm(-5);
       },
-    });
-  }, [isPlaying, handleTogglePlay, handleAdjustBpm]);
+    };
+
+    mediaSessionManager.setup(handlers);
+    mediaSessionManager.updateHandlers(handlers);
+  }, [handleTogglePlay, handleAdjustBpm]);
 
   // Sound toggle
   const handleToggleSound = () => {

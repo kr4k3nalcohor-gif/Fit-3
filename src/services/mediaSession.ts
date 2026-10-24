@@ -1,6 +1,6 @@
 import { generateCaratulaDataUrl } from '../utils/caratulaGenerator';
 
-interface MediaSessionHandlers {
+export interface MediaSessionHandlers {
   onPlay: () => void;
   onPause: () => void;
   onNextTrack: () => void;
@@ -9,6 +9,7 @@ interface MediaSessionHandlers {
 
 class MediaSessionManager {
   private handlers: MediaSessionHandlers | null = null;
+  private isInitialized: boolean = false;
   private lastCaratulaUrl: string = '/caratula-fit3.svg';
   private lastBpm: number = 0;
   private lastPlaying: boolean = false;
@@ -17,6 +18,9 @@ class MediaSessionManager {
     this.handlers = handlers;
 
     if (!('mediaSession' in navigator)) return;
+
+    if (this.isInitialized) return;
+    this.isInitialized = true;
 
     try {
       navigator.mediaSession.setActionHandler('play', () => {
@@ -27,16 +31,31 @@ class MediaSessionManager {
         this.handlers?.onPause();
       });
 
+      // Next button on Galaxy Fit 3 Media Controller -> +5 BPM
       navigator.mediaSession.setActionHandler('nexttrack', () => {
         this.handlers?.onNextTrack();
       });
 
+      // Previous button on Galaxy Fit 3 Media Controller -> -5 BPM
       navigator.mediaSession.setActionHandler('previoustrack', () => {
+        this.handlers?.onPreviousTrack();
+      });
+
+      // Seek actions (often sent by watch long-press or certain One UI firmware builds)
+      navigator.mediaSession.setActionHandler('seekforward', () => {
+        this.handlers?.onNextTrack();
+      });
+
+      navigator.mediaSession.setActionHandler('seekbackward', () => {
         this.handlers?.onPreviousTrack();
       });
     } catch {
       // Browser might ignore some action handlers
     }
+  }
+
+  public updateHandlers(handlers: MediaSessionHandlers) {
+    this.handlers = handlers;
   }
 
   public update(bpm: number, beats: number, currentBeat: number, isPlaying: boolean) {

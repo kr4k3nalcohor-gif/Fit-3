@@ -322,7 +322,10 @@ dependencies {
     'MainActivity.kt',
     `package com.pulsefit.metronome
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -338,6 +341,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -345,6 +349,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -355,12 +360,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             PulseFitNativeApp(
-                onStartService = { bpm, beats, vibrationMs ->
+                onStartService = { bpm, beats, vibrationMs, vibratePhone ->
                     val intent = Intent(this, MetronomeService::class.java).apply {
                         action = MetronomeService.ACTION_START
                         putExtra(MetronomeService.EXTRA_BPM, bpm)
                         putExtra(MetronomeService.EXTRA_BEATS, beats)
                         putExtra(MetronomeService.EXTRA_VIBRATION_MS, vibrationMs)
+                        putExtra(MetronomeService.EXTRA_VIBRATE_PHONE, vibratePhone)
                     }
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         startForegroundService(intent)
@@ -388,14 +394,36 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun PulseFitNativeApp(
-    onStartService: (bpm: Int, beats: Int, vibrationMs: Long) -> Unit,
+    onStartService: (bpm: Int, beats: Int, vibrationMs: Long, vibratePhone: Boolean) -> Unit,
     onStopService: () -> Unit,
     onUpdateBpm: (bpm: Int) -> Unit
 ) {
-    var isPlaying by remember { mutableStateOf(false) }
-    var bpm by remember { mutableStateOf(160) }
+    val context = LocalContext.current
+    var isPlaying by remember { mutableStateOf(MetronomeService.isServiceRunning) }
+    var bpm by remember { mutableStateOf(MetronomeService.currentBpm) }
     var beats by remember { mutableStateOf(4) }
     var vibrationMs by remember { mutableStateOf(85L) }
+    var vibratePhone by remember { mutableStateOf(false) }
+
+    DisposableEffect(Unit) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                if (intent?.action == MetronomeService.ACTION_BPM_UPDATED) {
+                    val updatedBpm = intent.getIntExtra(MetronomeService.EXTRA_BPM, bpm)
+                    bpm = updatedBpm
+                }
+            }
+        }
+        val filter = IntentFilter(MetronomeService.ACTION_BPM_UPDATED)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            context.registerReceiver(receiver, filter)
+        }
+        onDispose {
+            try { context.unregisterReceiver(receiver) } catch (_: Exception) {}
+        }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -406,14 +434,14 @@ fun PulseFitNativeApp(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Text("PulseFit APK", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Text("PulseFit", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
 
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier.size(200.dp).clip(CircleShape).background(if (isPlaying) Color(0x33F43F5E) else Color(0xFF0F172A))
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("$bpm", fontSize = 60.sp, fontWeight = FontWeight.Black, color = Color.White, fontFamily = FontFamily.Monospace)
+                    Text("\$bpm", fontSize = 60.sp, fontWeight = FontWeight.Black, color = Color.White, fontFamily = FontFamily.Monospace)
                     Text("BPM", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF38BDF8))
                 }
             }
@@ -422,7 +450,7 @@ fun PulseFitNativeApp(
                 Button(
                     onClick = {
                         isPlaying = !isPlaying
-                        if (isPlaying) onStartService(bpm, beats, vibrationMs) else onStopService()
+                        if (isPlaying) onStartService(bpm, beats, vibrationMs, vibratePhone) else onStopService()
                     },
                     modifier = Modifier.fillMaxWidth().height(66.dp),
                     shape = RoundedCornerShape(18.dp),
@@ -444,8 +472,8 @@ fun PulseFitNativeApp(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text("2. AJUSTE DE TIEMPO", color = Color(0xFF38BDF8), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            Text("$bpm BPM", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold)
+                            Text("2. AJUSTE DE TIEMPO (±5 FIT 3)", color = Color(0xFF38BDF8), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("\$bpm BPM", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold)
                         }
                         Row {
                             IconButton(onClick = { bpm = (bpm - 5).coerceAtLeast(30); onUpdateBpm(bpm) }) {
@@ -470,7 +498,7 @@ fun PulseFitNativeApp(
                     ) {
                         Column {
                             Text("3. AJUSTE DE COMPÁS", color = Color(0xFF34D399), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            Text("$beats/4 TIEMPOS", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
+                            Text("\$beats/4 TIEMPOS", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
                         }
                         Icon(Icons.Default.Tune, "Configurar", tint = Color(0xFF34D399))
                     }
@@ -490,6 +518,9 @@ fun PulseFitNativeApp(
 import android.app.*
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioTrack
 import android.os.*
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
@@ -511,19 +542,31 @@ class MetronomeService : Service() {
     private var beatsPerMeasure = 4
     private var currentBeat = 0
     private var vibrationMs = 85L
+    private var vibratePhone = false
+
+    private var audioTrack: AudioTrack? = null
+    private var accentPcm: ShortArray = ShortArray(0)
+    private var regularPcm: ShortArray = ShortArray(0)
 
     companion object {
         const val ACTION_START = "ACTION_START"
         const val ACTION_STOP = "ACTION_STOP"
         const val ACTION_SET_BPM = "ACTION_SET_BPM"
+        const val ACTION_BPM_UPDATED = "com.pulsefit.metronome.BPM_UPDATED"
+
         const val EXTRA_BPM = "EXTRA_BPM"
         const val EXTRA_BEATS = "EXTRA_BEATS"
         const val EXTRA_VIBRATION_MS = "EXTRA_VIBRATION_MS"
+        const val EXTRA_VIBRATE_PHONE = "EXTRA_VIBRATE_PHONE"
+
+        var currentBpm = 160
+        var isServiceRunning = false
     }
 
     override fun onCreate() {
         super.onCreate()
         initVibrator()
+        initAudioEngine()
         initMediaSession()
         createNotificationChannel()
     }
@@ -538,6 +581,63 @@ class MetronomeService : Service() {
         }
     }
 
+    private fun initAudioEngine() {
+        val sampleRate = 44100
+        val accentDuration = (0.040 * sampleRate).toInt()
+        val regularDuration = (0.025 * sampleRate).toInt()
+
+        accentPcm = ShortArray(accentDuration)
+        for (i in 0 until accentDuration) {
+            val t = i.toDouble() / sampleRate
+            val decay = kotlin.math.exp(-i.toDouble() / (sampleRate * 0.007))
+            val sample = (kotlin.math.sin(2.0 * Math.PI * 1200.0 * t) * decay * 32767.0 * 0.95).toInt()
+            accentPcm[i] = sample.coerceIn(-32768, 32767).toShort()
+        }
+
+        regularPcm = ShortArray(regularDuration)
+        for (i in 0 until regularDuration) {
+            val t = i.toDouble() / sampleRate
+            val decay = kotlin.math.exp(-i.toDouble() / (sampleRate * 0.006))
+            val sample = (kotlin.math.sin(2.0 * Math.PI * 820.0 * t) * decay * 32767.0 * 0.85).toInt()
+            regularPcm[i] = sample.coerceIn(-32768, 32767).toShort()
+        }
+
+        val bufferSize = AudioTrack.getMinBufferSize(
+            sampleRate,
+            AudioFormat.CHANNEL_OUT_MONO,
+            AudioFormat.ENCODING_PCM_16BIT
+        ).coerceAtLeast(accentDuration * 4)
+
+        try {
+            audioTrack = AudioTrack.Builder()
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build()
+                )
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .setSampleRate(sampleRate)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .build()
+                )
+                .setBufferSizeInBytes(bufferSize)
+                .setTransferMode(AudioTrack.MODE_STREAM)
+                .build()
+
+            audioTrack?.play()
+        } catch (_: Exception) {}
+    }
+
+    private fun playBeatAudio(isAccent: Boolean) {
+        try {
+            val buffer = if (isAccent) accentPcm else regularPcm
+            audioTrack?.write(buffer, 0, buffer.size)
+        } catch (_: Exception) {}
+    }
+
     private fun initMediaSession() {
         mediaSession = MediaSessionCompat(this, "PulseFitMediaSession").apply {
             setFlags(MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS)
@@ -546,6 +646,8 @@ class MetronomeService : Service() {
                 override fun onPause() { stopMetronome() }
                 override fun onSkipToNext() { setBpm(bpm + 5) }
                 override fun onSkipToPrevious() { setBpm(bpm - 5) }
+                override fun onFastForward() { setBpm(bpm + 5) }
+                override fun onRewind() { setBpm(bpm - 5) }
             })
             isActive = true
         }
@@ -555,8 +657,10 @@ class MetronomeService : Service() {
         when (intent?.action) {
             ACTION_START -> {
                 bpm = intent.getIntExtra(EXTRA_BPM, bpm)
+                currentBpm = bpm
                 beatsPerMeasure = intent.getIntExtra(EXTRA_BEATS, beatsPerMeasure)
                 vibrationMs = intent.getLongExtra(EXTRA_VIBRATION_MS, vibrationMs)
+                vibratePhone = intent.getBooleanExtra(EXTRA_VIBRATE_PHONE, false)
                 startMetronome()
             }
             ACTION_STOP -> stopMetronome()
@@ -570,6 +674,7 @@ class MetronomeService : Service() {
     private fun startMetronome() {
         if (isPlaying) return
         isPlaying = true
+        isServiceRunning = true
         currentBeat = 0
         updateMediaSession()
         startForeground(NOTIF_ID, buildNotification())
@@ -577,7 +682,10 @@ class MetronomeService : Service() {
         job = scope.launch {
             while (isActive && isPlaying) {
                 val intervalMs = (60_000.0 / bpm).toLong()
-                triggerHaptic(currentBeat)
+                playBeatAudio(currentBeat == 0)
+                if (vibratePhone) {
+                    triggerHaptic(currentBeat)
+                }
                 currentBeat = (currentBeat + 1) % beatsPerMeasure
                 updateMediaSession()
                 delay(intervalMs)
@@ -587,6 +695,7 @@ class MetronomeService : Service() {
 
     private fun stopMetronome() {
         isPlaying = false
+        isServiceRunning = false
         job?.cancel()
         job = null
         updateMediaSession()
@@ -596,7 +705,14 @@ class MetronomeService : Service() {
 
     private fun setBpm(newBpm: Int) {
         bpm = newBpm.coerceIn(30, 260)
+        currentBpm = bpm
         updateMediaSession()
+
+        val broadcastIntent = Intent(ACTION_BPM_UPDATED).apply {
+            putExtra(EXTRA_BPM, bpm)
+            setPackage(packageName)
+        }
+        sendBroadcast(broadcastIntent)
     }
 
     private fun triggerHaptic(beat: Int) {
@@ -618,23 +734,23 @@ class MetronomeService : Service() {
         val state = if (isPlaying) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED
         mediaSession?.setPlaybackState(
             PlaybackStateCompat.Builder()
-                .setActions(PlaybackStateCompat.ACTION_PLAY_PAUSE or PlaybackStateCompat.ACTION_SKIP_TO_NEXT or PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS)
+                .setActions(PlaybackStateCompat.ACTION_PLAY_PAUSE or PlaybackStateCompat.ACTION_SKIP_TO_NEXT or PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or PlaybackStateCompat.ACTION_FAST_FORWARD or PlaybackStateCompat.ACTION_REWIND)
                 .setState(state, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 1.0f)
                 .build()
         )
         mediaSession?.setMetadata(
             MediaMetadataCompat.Builder()
                 .putString(MediaMetadataCompat.METADATA_KEY_TITLE, if (isPlaying) "PulseFit: En Ritmo" else "PulseFit: Pausado")
-                .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, "BPM: $bpm")
-                .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, "Compás $beatsPerMeasure/4 • Pulso \${currentBeat + 1}")
+                .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, "BPM: \$bpm")
+                .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, "Compás \$beatsPerMeasure/4 • Pulso \${currentBeat + 1}")
                 .build()
         )
     }
 
     private fun buildNotification(): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("PulseFit: $bpm BPM ($beatsPerMeasure/4)")
-            .setContentText("Pulso háptico activo · Control en Galaxy Fit 3")
+            .setContentTitle("PulseFit: \$bpm BPM (\$beatsPerMeasure/4)")
+            .setContentText("Sonido activo · Control en Galaxy Fit 3")
             .setSmallIcon(android.R.drawable.ic_lock_idle_charging)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
@@ -650,6 +766,17 @@ class MetronomeService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onDestroy() {
+        super.onDestroy()
+        stopMetronome()
+        try {
+            audioTrack?.stop()
+            audioTrack?.release()
+        } catch (_: Exception) {}
+        audioTrack = null
+        mediaSession?.release()
+    }
 }
 `
   );

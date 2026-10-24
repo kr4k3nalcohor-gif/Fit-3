@@ -42,13 +42,12 @@ class HapticsService {
     const baseMs = config.durationMs || HAPTIC_PRESETS[config.intensity].durationMs;
     const isAccent = beatNumber === 0 && config.accentFirstBeat;
 
+    // Only vibrate phone if explicitly enabled by user
     if (config.vibrateOnPhone && 'vibrate' in navigator) {
       try {
         if (isAccent) {
-          // Double buzz for the first beat
           navigator.vibrate([baseMs * 1.3, 35, baseMs * 0.9]);
         } else {
-          // Crisp single pulse
           navigator.vibrate(baseMs);
         }
       } catch {
@@ -56,7 +55,7 @@ class HapticsService {
       }
     }
 
-    // If connected via Web Bluetooth GATT Immediate Alert
+    // Always send vibration signal to Galaxy Fit 3 wearable when enabled
     if (config.vibrateOnFit3 && this.alertCharacteristic) {
       try {
         const alertLevel = isAccent ? 2 : 1; // 2 = High Alert, 1 = Mild Alert
@@ -67,16 +66,23 @@ class HapticsService {
     }
   }
 
-  public testHaptic(intensity: HapticIntensity, isAccent: boolean = false) {
+  public testHaptic(intensity: HapticIntensity, isAccent: boolean = false, vibratePhone: boolean = false) {
     if (intensity === 'off') return;
     const baseMs = HAPTIC_PRESETS[intensity].durationMs;
-    if ('vibrate' in navigator) {
+
+    if (vibratePhone && 'vibrate' in navigator) {
       try {
         if (isAccent) {
           navigator.vibrate([baseMs * 1.3, 35, baseMs * 0.9]);
         } else {
           navigator.vibrate(baseMs);
         }
+      } catch {}
+    }
+
+    if (this.alertCharacteristic) {
+      try {
+        this.alertCharacteristic.writeValue(new Uint8Array([isAccent ? 2 : 1]));
       } catch {}
     }
   }
