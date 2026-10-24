@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Check, Watch, Download, Sparkles, AlertCircle } from 'lucide-react';
+import { X, Check, Watch, Download, Sparkles, Vibrate, CheckCircle2 } from 'lucide-react';
 
 interface Fit3PairingGuideModalProps {
   isOpen: boolean;
@@ -13,17 +13,17 @@ export const Fit3PairingGuideModal: React.FC<Fit3PairingGuideModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl flex flex-col gap-5 max-h-[90vh] overflow-y-auto text-left">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in text-left">
+      <div className="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl flex flex-col gap-5 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div>
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
               <Watch className="w-5 h-5 text-rose-400" />
-              Guía Samsung Galaxy Fit 3 y APK
+              Galaxy Fit 3: Carátula y Vibración
             </h2>
             <p className="text-xs text-slate-400">
-              Cómo sincronizar la tarjeta de la pulsera y controlar los BPM desde tu muñeca
+              Cómo funciona el Controlador Multimedia en tu pulsera Samsung Galaxy Fit 3
             </p>
           </div>
           <button
@@ -35,71 +35,86 @@ export const Fit3PairingGuideModal: React.FC<Fit3PairingGuideModalProps> = ({
           </button>
         </div>
 
-        {/* Section 1: Tarjeta de la pulsera */}
+        {/* Section 1: La Interfaz Real de la Galaxy Fit 3 */}
         <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
           <div className="flex items-center gap-2 text-rose-400 text-xs font-bold uppercase tracking-wider">
             <Sparkles className="w-4 h-4" />
-            <span>1. Tarjeta Multimedia en Galaxy Fit 3</span>
+            <span>1. Interfaz Oficial: Controlador Multimedia</span>
           </div>
           <p className="text-xs text-slate-300 leading-relaxed">
-            La pulsera Samsung Galaxy Fit 3 sincroniza automáticamente las sesiones de audio y metrónomo a través de la tarjeta <strong>Controlador Multimedia</strong>:
+            La Samsung Galaxy Fit 3 (con sistema FreeRTOS) no permite instalar aplicaciones de terceros directamente en la pulsera. Su forma oficial y probada de controlar el metrónomo es a través de su tarjeta nativa de <strong>Controlador multimedia</strong>:
           </p>
-          <ul className="text-xs text-slate-400 space-y-2 list-disc pl-4">
-            <li>
-              Abre la app <strong>Galaxy Wearable</strong> en tu móvil Samsung o Android.
+          <ul className="text-xs text-slate-300 space-y-2 list-none">
+            <li className="flex items-start gap-2 bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <div>
+                <strong className="text-white block">Carátula de Álbum en Pantalla</strong>
+                <span className="text-slate-400 text-[11px]">
+                  PulseFit envía la carátula gráfica con el tempo actual, los anillos de pulso y el compás, mostrándola directamente en el fondo de la pantalla de tu Fit 3.
+                </span>
+              </div>
             </li>
-            <li>
-              Ve a <strong>Tarjetas (Widgets)</strong> y confirma que la tarjeta <strong>Controlador multimedia</strong> esté activa en tu pulsera.
+            <li className="flex items-start gap-2 bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <div>
+                <strong className="text-white block">Línea 1: PulseFit: En Ritmo | Línea 2: BPM: 100</strong>
+                <span className="text-slate-400 text-[11px]">
+                  El título y subtítulo se adaptan al estándar exacto de One UI Watch para ver tus pulsaciones por minuto al instante al mirar tu muñeca.
+                </span>
+              </div>
             </li>
-            <li>
-              Al pulsar <strong>Iniciar</strong> en PulseFit, la pantalla de tu Fit 3 mostrará en tiempo real: <em>&quot;⚡ 160 BPM · Compás 4/4&quot;</em>.
-            </li>
-            <li>
-              <strong>Cambiar BPM desde la muñeca:</strong> Toca el botón <em>Siguiente</em> para subir (+5 BPM) o <em>Anterior</em> para bajar (-5 BPM) sin tener que sacar el móvil de la riñonera.
+            <li className="flex items-start gap-2 bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <div>
+                <strong className="text-white block">Botones Táctiles en la Muñeca</strong>
+                <span className="text-slate-400 text-[11px]">
+                  <strong>|&lt;</strong> resta 5 BPM · <strong>Botón central</strong> pausa/reanuda · <strong>&gt;|</strong> suma 5 BPM.
+                </span>
+              </div>
             </li>
           </ul>
         </div>
 
-        {/* Section 2: Vibración háptica en ejercicio */}
+        {/* Section 2: Vibración en la pulsera Fit 3 */}
         <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
           <div className="flex items-center gap-2 text-sky-400 text-xs font-bold uppercase tracking-wider">
-            <Watch className="w-4 h-4" />
-            <span>2. Retroalimentación Háptica para Ejercicio</span>
+            <Vibrate className="w-4 h-4" />
+            <span>2. Vibración Háptica en la Pulsera</span>
           </div>
           <p className="text-xs text-slate-300 leading-relaxed">
-            Para mantener un paso regular durante el running, caminata o entrenamiento:
+            Para recibir la vibración en tu muñeca con cada pulso del metrónomo:
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-            <div className="bg-slate-900 border border-slate-800 p-2.5 rounded-xl">
-              <div className="font-bold text-white mb-1">Vibración en Muñeca</div>
+            <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl">
+              <div className="font-bold text-white mb-1 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-sky-400" />
+                <span>Vía Bluetooth GATT</span>
+              </div>
               <div className="text-slate-400 text-[11px]">
-                Usa el botón de Escanear Bluetooth en la app para emparejar el canal de alertas y vibración directa en el motor de la Fit 3.
+                Pulsa &quot;Vincular Bluetooth Galaxy Fit 3&quot; para enviar señales hápticas directas al motor de vibración de la pulsera.
               </div>
             </div>
-            <div className="bg-slate-900 border border-slate-800 p-2.5 rounded-xl">
-              <div className="font-bold text-white mb-1">Vibración en Brazalete/Móvil</div>
+            <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl">
+              <div className="font-bold text-white mb-1 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-rose-400" />
+                <span>Vía Android Service (APK)</span>
+              </div>
               <div className="text-slate-400 text-[11px]">
-                El motor háptico de tu smartphone vibra con pulsos calibrados (de 25ms a 125ms) perceptibles incluso corriendo a ritmo intenso.
+                El servicio en segundo plano de Android transmite cada cambio de compás con feedback háptico constante tanto al móvil como a los dispositivos emparejados.
               </div>
             </div>
           </div>
         </div>
 
-        {/* Section 3: Instalar como APK / PWA */}
+        {/* Section 3: Instalar como APK */}
         <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
           <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold uppercase tracking-wider">
             <Download className="w-4 h-4" />
-            <span>3. Instalar en tu Android (Modo APK Standalone)</span>
+            <span>3. Instalar en tu Android</span>
           </div>
           <p className="text-xs text-slate-300 leading-relaxed">
-            Puedes instalar esta aplicación directamente en tu smartphone Android con un solo toque:
+            Abre el menú de tu navegador en tu teléfono (Chrome o Samsung Internet) y pulsa <strong>&quot;Instalar aplicación&quot;</strong>. La app se instalará en tu móvil con icono propio y funcionará a pantalla completa para tus entrenamientos.
           </p>
-          <div className="flex items-start gap-3 bg-slate-900 p-3 rounded-xl border border-slate-800">
-            <AlertCircle className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-            <div className="text-xs text-slate-300">
-              En tu navegador (Chrome o Samsung Internet), toca el menú de <strong>tres puntos (⋮)</strong> y selecciona <strong>&quot;Instalar aplicación&quot;</strong> o <strong>&quot;Añadir a pantalla de inicio&quot;</strong>. Funcionará como una APK nativa a pantalla completa y sin consumir datos.
-            </div>
-          </div>
         </div>
 
         {/* Bottom Button */}
@@ -109,7 +124,7 @@ export const Fit3PairingGuideModal: React.FC<Fit3PairingGuideModalProps> = ({
           className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors"
         >
           <Check className="w-4 h-4 text-emerald-400" />
-          <span>Entendido, volver al metrónomo</span>
+          <span>Entendido, volver a la pantalla</span>
         </button>
       </div>
     </div>

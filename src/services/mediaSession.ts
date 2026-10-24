@@ -1,3 +1,5 @@
+import { generateCaratulaDataUrl } from '../utils/caratulaGenerator';
+
 interface MediaSessionHandlers {
   onPlay: () => void;
   onPause: () => void;
@@ -7,6 +9,9 @@ interface MediaSessionHandlers {
 
 class MediaSessionManager {
   private handlers: MediaSessionHandlers | null = null;
+  private lastCaratulaUrl: string = '/caratula-fit3.svg';
+  private lastBpm: number = 0;
+  private lastPlaying: boolean = false;
 
   public setup(handlers: MediaSessionHandlers) {
     this.handlers = handlers;
@@ -37,13 +42,28 @@ class MediaSessionManager {
   public update(bpm: number, beats: number, currentBeat: number, isPlaying: boolean) {
     if (!('mediaSession' in navigator)) return;
 
+    // Only regenerate dynamic image URL when bpm or play state changes to avoid excessive canvas draws
+    if (bpm !== this.lastBpm || isPlaying !== this.lastPlaying || !this.lastCaratulaUrl) {
+      this.lastBpm = bpm;
+      this.lastPlaying = isPlaying;
+      try {
+        this.lastCaratulaUrl = generateCaratulaDataUrl(bpm, beats, currentBeat, isPlaying);
+      } catch {
+        this.lastCaratulaUrl = '/caratula-fit3.svg';
+      }
+    }
+
     try {
+      // Title and Artist formatted specifically for Samsung Galaxy Fit 3 Media Controller tile:
+      // Line 1: Track Title ("PulseFit: En Ritmo")
+      // Line 2: Artist ("BPM: 100") -> exactly matches Samsung One UI Media Controller display!
       navigator.mediaSession.metadata = new MediaMetadata({
-        title: `⚡ ${bpm} BPM • Compás ${beats}/4`,
-        artist: 'PulseFit Metrónomo Deportivo',
-        album: isPlaying ? `Ritmo Activo: Pulso ${currentBeat + 1}/${beats}` : 'Metrónomo en Pausa',
+        title: isPlaying ? `PulseFit: En Ritmo` : `PulseFit: Pausado`,
+        artist: `BPM: ${bpm}`,
+        album: `Compás ${beats}/4 • Pulso ${currentBeat + 1}`,
         artwork: [
-          { src: '/icon.svg', sizes: '512x512', type: 'image/svg+xml' }
+          { src: this.lastCaratulaUrl, sizes: '512x512', type: 'image/png' },
+          { src: '/caratula-fit3.svg', sizes: '512x512', type: 'image/svg+xml' }
         ]
       });
 

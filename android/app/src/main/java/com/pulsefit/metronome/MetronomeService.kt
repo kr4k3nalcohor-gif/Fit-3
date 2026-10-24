@@ -185,9 +185,9 @@ class MetronomeService : Service() {
 
         mediaSession?.setMetadata(
             MediaMetadataCompat.Builder()
-                .putString(MediaMetadataCompat.METADATA_KEY_TITLE, "⚡ $bpm BPM · Compás $beatsPerMeasure/4")
-                .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, "PulseFit Metrónomo Háptico")
-                .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, if (isPlaying) "Tiempo ${currentBeat + 1}/$beatsPerMeasure" else "Pausado")
+                .putString(MediaMetadataCompat.METADATA_KEY_TITLE, if (isPlaying) "PulseFit: En Ritmo" else "PulseFit: Pausado")
+                .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, "BPM: $bpm")
+                .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, "Compás $beatsPerMeasure/4 • Pulso ${currentBeat + 1}")
                 .build()
         )
     }

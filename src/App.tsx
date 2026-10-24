@@ -224,7 +224,7 @@ export default function App() {
             onClick={() => setMobileTab('fit3')}
             className="hover:text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
-            Tarjeta Galaxy Fit 3
+            Controlador Galaxy Fit 3
           </button>
           <button 
             type="button"
@@ -300,7 +300,7 @@ export default function App() {
             }`}
           >
             <Watch className="w-3.5 h-3.5" />
-            <span>Muñeca Galaxy Fit 3</span>
+            <span>Carátula Galaxy Fit 3</span>
           </button>
         </div>
 

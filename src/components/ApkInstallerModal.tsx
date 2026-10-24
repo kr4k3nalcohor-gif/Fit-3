@@ -375,18 +375,18 @@ export const ApkInstallerModal: React.FC<ApkInstallerModalProps> = ({
               <div className="flex items-center justify-between">
                 <span className="font-bold text-white flex items-center gap-2 text-sm">
                   <FileCode className="w-4 h-4 text-emerald-400" />
-                  <span>Repositorio: kr4k3nalcohor-gif/Pulse-Fit-3-apk</span>
+                  <span>Repositorio: kr4k3nalcohor-gif/Fit-3</span>
                 </span>
                 <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
                   GitHub
                 </span>
               </div>
               <p className="text-slate-400 text-[11px]">
-                Hemos enlazado el repositorio y preparado el commit inicial con todo el código nativo Kotlin, Gradle y el workflow de compilación de APK.
+                Hemos enlazado el repositorio y preparado el commit con todo el código nativo Kotlin, Gradle y el workflow de compilación de APK.
               </p>
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 <a
-                  href="https://github.com/kr4k3nalcohor-gif/Pulse-Fit-3-apk"
+                  href="https://github.com/kr4k3nalcohor-gif/Fit-3"
                   target="_blank"
                   rel="noreferrer"
                   className="py-2 px-3 bg-slate-900 hover:bg-slate-850 text-sky-400 font-bold rounded-xl border border-slate-750 flex items-center gap-1.5 cursor-pointer"
@@ -395,7 +395,7 @@ export const ApkInstallerModal: React.FC<ApkInstallerModalProps> = ({
                   <span>Abrir Repositorio</span>
                 </a>
                 <a
-                  href="https://github.com/kr4k3nalcohor-gif/Pulse-Fit-3-apk/actions"
+                  href="https://github.com/kr4k3nalcohor-gif/Fit-3/actions"
                   target="_blank"
                   rel="noreferrer"
                   className="py-2 px-3 bg-slate-900 hover:bg-slate-850 text-emerald-400 font-bold rounded-xl border border-slate-750 flex items-center gap-1.5 cursor-pointer"
@@ -435,11 +435,11 @@ export const ApkInstallerModal: React.FC<ApkInstallerModalProps> = ({
                 Cómo activar la compilación del APK en GitHub Actions:
               </span>
               <p className="text-slate-400 text-[11px]">
-                1. Sube el código o el contenido del ZIP a tu repositorio <strong>Pulse-Fit-3-apk</strong>.<br/>
+                1. Sube el código o el contenido del ZIP a tu repositorio <strong>Fit-3</strong>.<br/>
                 2. Si usas Git por terminal, ejecuta:
               </p>
               <pre className="p-3 bg-slate-900 rounded-xl text-[10px] font-mono-numbers text-slate-300 overflow-x-auto border border-slate-800">
-{`git remote set-url origin https://<TU_TOKEN_GITHUB>@github.com/kr4k3nalcohor-gif/Pulse-Fit-3-apk.git
+{`git remote set-url origin https://<TU_TOKEN_GITHUB>@github.com/kr4k3nalcohor-gif/Fit-3.git
 git push -u origin main`}
               </pre>
               <p className="text-slate-400 text-[11px]">
