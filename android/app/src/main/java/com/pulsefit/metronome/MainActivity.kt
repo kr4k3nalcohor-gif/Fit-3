@@ -236,6 +236,7 @@ fun PulseFitNativeApp(
                 Button(
                     onClick = {
                         isPlaying = !isPlaying
+                        Log.d("MainActivity", "User clicked Play/Stop. New isPlaying state: $isPlaying")
                         if (isPlaying) {
                             onStartService(bpm, beats, vibrationMs, vibratePhone)
                         } else {
@@ -269,7 +270,10 @@ fun PulseFitNativeApp(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { showTempoDialog = true },
+                        .clickable {
+                            Log.d("MainActivity", "User opened Tempo dialog")
+                            showTempoDialog = true
+                        },
                     shape = RoundedCornerShape(18.dp),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF131B2E))
                 ) {
@@ -299,12 +303,14 @@ fun PulseFitNativeApp(
                         Row {
                             IconButton(onClick = {
                                 bpm = (bpm - 5).coerceAtLeast(30)
+                                Log.d("MainActivity", "Decremented BPM (-5) to: $bpm")
                                 onUpdateBpm(bpm)
                             }) {
                                 Icon(Icons.Default.Remove, contentDescription = "-5", tint = Color.White)
                             }
                             IconButton(onClick = {
                                 bpm = (bpm + 5).coerceAtMost(260)
+                                Log.d("MainActivity", "Incremented BPM (+5) to: $bpm")
                                 onUpdateBpm(bpm)
                             }) {
                                 Icon(Icons.Default.Add, contentDescription = "+5", tint = Color.White)
@@ -317,7 +323,10 @@ fun PulseFitNativeApp(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { showBeatsDialog = true },
+                        .clickable {
+                            Log.d("MainActivity", "User opened Beats dialog")
+                            showBeatsDialog = true
+                        },
                     shape = RoundedCornerShape(18.dp),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF131B2E))
                 ) {
@@ -368,6 +377,7 @@ fun PulseFitNativeApp(
                             value = bpm.toFloat(),
                             onValueChange = {
                                 bpm = it.toInt()
+                                Log.d("MainActivity", "Slider changed BPM to: $bpm")
                                 onUpdateBpm(bpm)
                             },
                             valueRange = 40f..240f
@@ -393,6 +403,7 @@ fun PulseFitNativeApp(
                             TextButton(
                                 onClick = {
                                     beats = b
+                                    Log.d("MainActivity", "User selected beats: $b/4")
                                     showBeatsDialog = false
                                 },
                                 modifier = Modifier.fillMaxWidth()

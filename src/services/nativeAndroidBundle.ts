@@ -154,13 +154,27 @@ android {
     }
 
     signingConfigs {
-        val keystoreFile = file("\${rootDir}/debug.keystore")
-        if (keystoreFile.exists()) {
-            create("customDebug") {
+        val customKeystorePath = System.getenv("KEYSTORE_FILE") 
+            ?: (project.findProperty("KEYSTORE_FILE") as? String)
+        val keystoreFile = when {
+            customKeystorePath != null && file(customKeystorePath).exists() -> file(customKeystorePath)
+            file("\${rootDir}/release.keystore").exists() -> file("\${rootDir}/release.keystore")
+            file("\${rootDir}/debug.keystore").exists() -> file("\${rootDir}/debug.keystore")
+            else -> null
+        }
+
+        if (keystoreFile != null) {
+            create("flexibleSigning") {
                 storeFile = keystoreFile
-                storePassword = "android"
-                keyAlias = "androiddebugkey"
-                keyPassword = "android"
+                storePassword = System.getenv("KEYSTORE_PASSWORD") 
+                    ?: (project.findProperty("KEYSTORE_PASSWORD") as? String) 
+                    ?: "android"
+                keyAlias = System.getenv("KEY_ALIAS") 
+                    ?: (project.findProperty("KEY_ALIAS") as? String) 
+                    ?: "androiddebugkey"
+                keyPassword = System.getenv("KEY_PASSWORD") 
+                    ?: (project.findProperty("KEY_PASSWORD") as? String) 
+                    ?: "android"
             }
         }
     }
@@ -168,8 +182,8 @@ android {
     buildTypes {
         debug {
             isMinifyEnabled = false
-            if (signingConfigs.findByName("customDebug") != null) {
-                signingConfig = signingConfigs.getByName("customDebug")
+            if (signingConfigs.findByName("flexibleSigning") != null) {
+                signingConfig = signingConfigs.getByName("flexibleSigning")
             }
         }
         release {
@@ -178,8 +192,8 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            if (signingConfigs.findByName("customDebug") != null) {
-                signingConfig = signingConfigs.getByName("customDebug")
+            if (signingConfigs.findByName("flexibleSigning") != null) {
+                signingConfig = signingConfigs.getByName("flexibleSigning")
             } else {
                 signingConfig = signingConfigs.getByName("debug")
             }
@@ -601,6 +615,7 @@ class MetronomeService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        android.util.Log.i("MetronomeService", "MetronomeService onCreate: initializing components")
         initVibrator()
         initAudioEngine()
         initMediaSession()
@@ -837,6 +852,7 @@ class MetronomeService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        android.util.Log.i("MetronomeService", "MetronomeService onDestroy: releasing resources")
         super.onDestroy()
         stopMetronome()
         try {
@@ -847,6 +863,7 @@ class MetronomeService : Service() {
         }
         audioTrack = null
         mediaSession?.release()
+        android.util.Log.i("MetronomeService", "MetronomeService onDestroy completed")
     }
 }
 `

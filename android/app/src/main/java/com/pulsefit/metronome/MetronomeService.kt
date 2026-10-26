@@ -70,6 +70,7 @@ class MetronomeService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        Log.i(TAG, "MetronomeService onCreate: initializing components")
         initVibrator()
         initAudioEngine()
         initMediaSession()
@@ -352,6 +353,7 @@ class MetronomeService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        Log.i(TAG, "MetronomeService onDestroy: destroying service and releasing audio/media resources")
         super.onDestroy()
         stopMetronome()
         try {
@@ -362,5 +364,6 @@ class MetronomeService : Service() {
         }
         audioTrack = null
         mediaSession?.release()
+        Log.i(TAG, "MetronomeService onDestroy completed")
     }
 }
