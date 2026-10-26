@@ -58,38 +58,46 @@ class MediaSessionManager {
     this.handlers = handlers;
   }
 
-  public update(bpm: number, beats: number, currentBeat: number, isPlaying: boolean) {
-    if (!('mediaSession' in navigator)) return;
+  private lastBeats: number = 0;
 
-    // Only regenerate dynamic image URL when bpm or play state changes to avoid excessive canvas draws
-    if (bpm !== this.lastBpm || isPlaying !== this.lastPlaying || !this.lastCaratulaUrl) {
+  public update(bpm: number, beats: number, currentBeat: number, isPlaying: boolean) {
+    if (typeof window === 'undefined' || !('mediaSession' in navigator)) return;
+
+    const hasStateChanged = bpm !== this.lastBpm || isPlaying !== this.lastPlaying || beats !== this.lastBeats || !this.lastCaratulaUrl;
+
+    if (hasStateChanged) {
       this.lastBpm = bpm;
       this.lastPlaying = isPlaying;
+      this.lastBeats = beats;
+
       try {
         this.lastCaratulaUrl = generateCaratulaDataUrl(bpm, beats, currentBeat, isPlaying);
       } catch (canvasError: unknown) {
         console.warn('Caratula generation failed, falling back to static SVG:', canvasError);
         this.lastCaratulaUrl = '/caratula-fit3.svg';
       }
+
+      try {
+        if (typeof MediaMetadata !== 'undefined') {
+          navigator.mediaSession.metadata = new MediaMetadata({
+            title: isPlaying ? `PulseFit: En Ritmo` : `PulseFit: Pausado`,
+            artist: `BPM: ${bpm}`,
+            album: `Compás ${beats}/4 • Pulso ${currentBeat + 1}`,
+            artwork: [
+              { src: this.lastCaratulaUrl, sizes: '512x512', type: 'image/png' },
+              { src: '/caratula-fit3.svg', sizes: '512x512', type: 'image/svg+xml' }
+            ]
+          });
+        }
+      } catch (metadataError: unknown) {
+        console.debug('MediaSession metadata update ignored by platform:', metadataError);
+      }
     }
 
     try {
-      // Title and Artist formatted specifically for Samsung Galaxy Fit 3 Media Controller tile:
-      // Line 1: Track Title ("PulseFit: En Ritmo")
-      // Line 2: Artist ("BPM: 100") -> exactly matches Samsung One UI Media Controller display!
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: isPlaying ? `PulseFit: En Ritmo` : `PulseFit: Pausado`,
-        artist: `BPM: ${bpm}`,
-        album: `Compás ${beats}/4 • Pulso ${currentBeat + 1}`,
-        artwork: [
-          { src: this.lastCaratulaUrl, sizes: '512x512', type: 'image/png' },
-          { src: '/caratula-fit3.svg', sizes: '512x512', type: 'image/svg+xml' }
-        ]
-      });
-
       navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
-    } catch (metadataError: unknown) {
-      console.debug('MediaSession metadata update ignored by platform:', metadataError);
+    } catch (playbackError: unknown) {
+      console.debug('MediaSession playbackState update ignored:', playbackError);
     }
   }
 }

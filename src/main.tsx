@@ -1,15 +1,20 @@
-import {createRoot} from 'react-dom/client';
+import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
-import { registerSW } from 'virtual:pwa-register';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
-registerSW({ immediate: true });
-
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').catch((registrationError: unknown) => {
-    console.debug('ServiceWorker registration handled:', registrationError);
+// Only register PWA in production environments and never force auto-reload during dev/preview
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  import('virtual:pwa-register').then(({ registerSW }) => {
+    registerSW({ immediate: false });
+  }).catch((swLoadError: unknown) => {
+    console.debug('PWA registration skipped in current host:', swLoadError);
   });
 }
 
-createRoot(document.getElementById('root')!).render(<App />);
+createRoot(document.getElementById('root')!).render(
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>
+);
 

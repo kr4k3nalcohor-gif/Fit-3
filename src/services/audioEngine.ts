@@ -20,12 +20,20 @@ class AudioEngine {
   private silentGain: GainNode | null = null;
 
   private initContext() {
-    if (!this.audioCtx) {
-      const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      this.audioCtx = new AudioCtxClass();
+    if (!this.audioCtx && typeof window !== 'undefined') {
+      try {
+        const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        if (AudioCtxClass) {
+          this.audioCtx = new AudioCtxClass();
+        }
+      } catch (audioInitError: unknown) {
+        console.warn('AudioContext initialization note:', audioInitError);
+      }
     }
-    if (this.audioCtx.state === 'suspended') {
-      this.audioCtx.resume();
+    if (this.audioCtx && this.audioCtx.state === 'suspended') {
+      this.audioCtx.resume().catch((resumeError: unknown) => {
+        console.debug('AudioContext resume deferred until user gesture:', resumeError);
+      });
     }
   }
 

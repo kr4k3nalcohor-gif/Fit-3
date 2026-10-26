@@ -48,16 +48,16 @@ export const GalaxyFit3Simulator: React.FC<GalaxyFit3SimulatorProps> = ({
   const [vibrationToast, setVibrationToast] = useState<string | null>(null);
   const [caratulaUrl, setCaratulaUrl] = useState<string>('/caratula-fit3.svg');
 
-  // Keep caratula updated
+  // Keep caratula updated when bpm or play state changes
   useEffect(() => {
     try {
-      const url = generateCaratulaDataUrl(bpm, timeSignature.beats, currentBeat, isPlaying);
+      const url = generateCaratulaDataUrl(bpm, timeSignature.beats, 0, isPlaying);
       setCaratulaUrl(url);
     } catch (caratulaError: unknown) {
       console.warn('Simulator caratula generation fallback:', caratulaError);
       setCaratulaUrl('/caratula-fit3.svg');
     }
-  }, [bpm, timeSignature.beats, isPlaying, currentBeat]);
+  }, [bpm, timeSignature.beats, isPlaying]);
 
   const showVibrationFeedback = (msg: string) => {
     setVibrationToast(msg);
