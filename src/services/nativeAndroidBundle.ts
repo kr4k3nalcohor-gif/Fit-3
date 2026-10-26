@@ -871,29 +871,80 @@ class MetronomeService : Service() {
 
   zip.file(
     'README.md',
-    `# PulseFit - Native Android Metronome with Samsung Galaxy Fit 3 Sync
+    `# PulseFit (Fit-3)
 
-Este proyecto nativo de Android compila un APK debug para instalar directamente en cualquier teléfono Android.
+> Repositorio: **kr4k3nalcohor-gif/Fit-3**  
+> Metrónomo háptico con sonido en el teléfono móvil y control/vibración en la pulsera **Samsung Galaxy Fit 3**.
 
-## Cómo compilar el APK:
+---
 
-### Opción 1: Con GitHub Actions (Automático en la nube)
-1. Sube este proyecto a tu repositorio de GitHub.
-2. Ve a la pestaña **Actions** en tu repositorio.
-3. El workflow **Compilar APK Android Debug (PulseFit)** se ejecutará automáticamente y generará el archivo \`app-debug.apk\` listo para descargar e instalar.
+## ⌚ ¿Cómo funciona con la Samsung Galaxy Fit 3?
 
-### Opción 2: Con Gradle en tu ordenador o Android Studio
-1. Abre esta carpeta en **Android Studio** o en tu terminal:
+La Samsung Galaxy Fit 3 no requiere apps de terceros gracias al estándar **Android MediaSession**:
+
+1. **Controlador multimedia de la Fit 3**:
+   - **Play / Pausa**: Inicia o detiene el pulso del metrónomo.
+   - **Pista siguiente (⏭️)**: Aumenta el tempo **+5 BPM**.
+   - **Pista anterior (⏮️)**: Reduce el tempo **-5 BPM**.
+   - **Carátula en la pulsera**: Muestra el BPM actual, el compás (ej. \`4/4\`) y el número de pulso activo.
+
+2. **División de salida acústica y háptica**:
+   - **Teléfono móvil**: Emite el sonido de clic de metrónomo (con acento en el primer tiempo) mediante \`AudioTrack\` PCM de baja latencia.
+   - **Samsung Galaxy Fit 3**: Recibe la vibración háptica en la muñeca al ritmo exacto.
+   - *(Opcional)*: La vibración en el teléfono móvil puede activarse o desactivarse desde los ajustes (por defecto solo vibra la pulsera).
+
+---
+
+## 📱 Estructura del Proyecto
+
+\`\`\`text
+├── .github/workflows/
+│   └── build-apk.yml        # Flujo de CI para compilar y publicar APKs en GitHub Releases
+├── android/                 # Proyecto nativo Android (Kotlin + Jetpack Compose)
+│   ├── app/
+│   │   ├── build.gradle.kts # Configuración de SDK 35, dependencias y firma flexible
+│   │   └── src/main/java/com/pulsefit/metronome/
+│   │       ├── MainActivity.kt      # Interfaz de usuario con los 3 botones principales
+│   │       └── MetronomeService.kt  # Servicio Foreground con AudioTrack y MediaSession
+│   ├── build.gradle.kts
+│   └── gradlew
+└── README.md
+\`\`\`
+
+---
+
+## 🛠️ Cómo compilar el APK Android
+
+### Opción 1: Automático en GitHub Actions (Recomendado)
+Al hacer push o pull request en la rama \`main\` o \`master\`:
+1. El workflow \`.github/workflows/build-apk.yml\` se ejecuta automáticamente en Ubuntu con Java 17.
+2. Genera el APK firmado con la configuración flexible.
+3. Lo publica en la pestaña **Releases** de tu repositorio bajo la etiqueta \`latest-apk\` listo para descargar e instalar directamente.
+
+### Opción 2: Compilación local con Gradle
+Si tienes el SDK de Android o Android Studio instalado:
 \`\`\`bash
 cd android
 ./gradlew assembleDebug
 \`\`\`
-2. El archivo APK se generará en:
+El archivo APK se generará en:
 \`android/app/build/outputs/apk/debug/app-debug.apk\`
-3. Cópialo a tu teléfono Android o instálalo con:
+
+Para instalarlo directamente por USB con ADB:
 \`\`\`bash
-adb install android/app/build/outputs/apk/debug/app-debug.apk
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 \`\`\`
+
+---
+
+## 🔑 Variables de Firma (Opcional en CI)
+Si deseas firmar con tu propio certificado en lugar del keystore de depuración:
+- \`KEYSTORE_FILE\`: Ruta al archivo \`.keystore\` o \`.jks\`
+- \`KEYSTORE_PASSWORD\`: Contraseña del keystore
+- \`KEY_ALIAS\`: Alias de la llave
+- \`KEY_PASSWORD\`: Contraseña de la llave
+
+Si no se configuran, el build recurre automáticamente al keystore de depuración seguro sin interrumpir la compilación.
 `
   );
 
