@@ -153,28 +153,34 @@ class MetronomeService : Service() {
 
             setCallback(object : MediaSessionCompat.Callback() {
                 override fun onPlay() {
+                    Log.d(TAG, "MediaSession: onPlay received from Galaxy Fit 3 or lockscreen")
                     startMetronome()
                 }
 
                 override fun onPause() {
+                    Log.d(TAG, "MediaSession: onPause received from Galaxy Fit 3 or lockscreen")
                     stopMetronome()
                 }
 
                 override fun onSkipToNext() {
                     // Samsung Galaxy Fit 3 Next Track button -> +5 BPM
+                    Log.d(TAG, "MediaSession: onSkipToNext received (+5 BPM)")
                     setBpm(bpm + 5)
                 }
 
                 override fun onSkipToPrevious() {
                     // Samsung Galaxy Fit 3 Previous Track button -> -5 BPM
+                    Log.d(TAG, "MediaSession: onSkipToPrevious received (-5 BPM)")
                     setBpm(bpm - 5)
                 }
 
                 override fun onFastForward() {
+                    Log.d(TAG, "MediaSession: onFastForward received (+5 BPM)")
                     setBpm(bpm + 5)
                 }
 
                 override fun onRewind() {
+                    Log.d(TAG, "MediaSession: onRewind received (-5 BPM)")
                     setBpm(bpm - 5)
                 }
             })
@@ -184,6 +190,7 @@ class MetronomeService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d(TAG, "onStartCommand received action: ${intent?.action}")
         when (intent?.action) {
             ACTION_START -> {
                 bpm = intent.getIntExtra(EXTRA_BPM, bpm)
@@ -191,11 +198,16 @@ class MetronomeService : Service() {
                 beatsPerMeasure = intent.getIntExtra(EXTRA_BEATS, beatsPerMeasure)
                 vibrationMs = intent.getLongExtra(EXTRA_VIBRATION_MS, vibrationMs)
                 vibratePhone = intent.getBooleanExtra(EXTRA_VIBRATE_PHONE, false)
+                Log.i(TAG, "ACTION_START: BPM=$bpm, beats=$beatsPerMeasure, vibrationMs=$vibrationMs, vibratePhone=$vibratePhone")
                 startMetronome()
             }
-            ACTION_STOP -> stopMetronome()
+            ACTION_STOP -> {
+                Log.i(TAG, "ACTION_STOP received")
+                stopMetronome()
+            }
             ACTION_SET_BPM -> {
                 val newBpm = intent.getIntExtra(EXTRA_BPM, bpm)
+                Log.d(TAG, "ACTION_SET_BPM received: $newBpm")
                 setBpm(newBpm)
             }
         }
@@ -203,7 +215,11 @@ class MetronomeService : Service() {
     }
 
     private fun startMetronome() {
-        if (isPlaying) return
+        if (isPlaying) {
+            Log.d(TAG, "startMetronome: already running")
+            return
+        }
+        Log.i(TAG, "startMetronome: starting playback loop at $bpm BPM ($beatsPerMeasure/4)")
         isPlaying = true
         isServiceRunning = true
         currentBeat = 0
@@ -233,6 +249,7 @@ class MetronomeService : Service() {
     }
 
     private fun stopMetronome() {
+        Log.i(TAG, "stopMetronome: stopping playback loop")
         isPlaying = false
         isServiceRunning = false
         job?.cancel()
@@ -243,7 +260,9 @@ class MetronomeService : Service() {
     }
 
     private fun setBpm(newBpm: Int) {
-        bpm = newBpm.coerceIn(30, 260)
+        val clamped = newBpm.coerceIn(30, 260)
+        Log.i(TAG, "setBpm: changing BPM from $bpm to $clamped")
+        bpm = clamped
         currentBpm = bpm
         updateMediaSession()
         updateNotification()

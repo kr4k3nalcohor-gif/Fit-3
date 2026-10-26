@@ -64,6 +64,7 @@ jobs:
           tag_name: latest-apk
           name: "PulseFit Metrónomo APK (Última versión)"
           body: "APK instalable directo para teléfonos Android con soporte nativo de vibración háptica y sincronización con pulsera Samsung Galaxy Fit 3."
+          make_latest: true
         env:
           GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
 `
@@ -153,20 +154,22 @@ android {
     }
 
     signingConfigs {
-        create("debugConfig") {
-            storeFile = file("\${rootDir}/debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+        val keystoreFile = file("\${rootDir}/debug.keystore")
+        if (keystoreFile.exists()) {
+            create("customDebug") {
+                storeFile = keystoreFile
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
         }
     }
 
     buildTypes {
         debug {
             isMinifyEnabled = false
-            val customKeystore = file("\${rootDir}/debug.keystore")
-            if (customKeystore.exists()) {
-                signingConfig = signingConfigs.getByName("debugConfig")
+            if (signingConfigs.findByName("customDebug") != null) {
+                signingConfig = signingConfigs.getByName("customDebug")
             }
         }
         release {
@@ -175,9 +178,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            val customKeystore = file("\${rootDir}/debug.keystore")
-            if (customKeystore.exists()) {
-                signingConfig = signingConfigs.getByName("debugConfig")
+            if (signingConfigs.findByName("customDebug") != null) {
+                signingConfig = signingConfigs.getByName("customDebug")
+            } else {
+                signingConfig = signingConfigs.getByName("debug")
             }
         }
     }
@@ -383,6 +387,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             PulseFitNativeApp(
                 onStartService = { bpm, beats, vibrationMs, vibratePhone ->
+                    android.util.Log.i("MainActivity", "Starting MetronomeService: BPM=\$bpm, beats=\$beats, vibration=\${vibrationMs}ms, vibratePhone=\$vibratePhone")
                     val intent = Intent(this, MetronomeService::class.java).apply {
                         action = MetronomeService.ACTION_START
                         putExtra(MetronomeService.EXTRA_BPM, bpm)
@@ -397,12 +402,14 @@ class MainActivity : ComponentActivity() {
                     }
                 },
                 onStopService = {
+                    android.util.Log.i("MainActivity", "Stopping MetronomeService")
                     val intent = Intent(this, MetronomeService::class.java).apply {
                         action = MetronomeService.ACTION_STOP
                     }
                     startService(intent)
                 },
                 onUpdateBpm = { bpm ->
+                    android.util.Log.i("MainActivity", "Updating MetronomeService BPM to \$bpm")
                     val intent = Intent(this, MetronomeService::class.java).apply {
                         action = MetronomeService.ACTION_SET_BPM
                         putExtra(MetronomeService.EXTRA_BPM, bpm)
@@ -432,6 +439,7 @@ fun PulseFitNativeApp(
             override fun onReceive(ctx: Context?, intent: Intent?) {
                 if (intent?.action == MetronomeService.ACTION_BPM_UPDATED) {
                     val updatedBpm = intent.getIntExtra(MetronomeService.EXTRA_BPM, bpm)
+                    android.util.Log.d("MainActivity", "BPM updated via Service broadcast: \$updatedBpm")
                     bpm = updatedBpm
                 }
             }
@@ -674,18 +682,37 @@ class MetronomeService : Service() {
         mediaSession = MediaSessionCompat(this, "PulseFitMediaSession").apply {
             setFlags(MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS)
             setCallback(object : MediaSessionCompat.Callback() {
-                override fun onPlay() { startMetronome() }
-                override fun onPause() { stopMetronome() }
-                override fun onSkipToNext() { setBpm(bpm + 5) }
-                override fun onSkipToPrevious() { setBpm(bpm - 5) }
-                override fun onFastForward() { setBpm(bpm + 5) }
-                override fun onRewind() { setBpm(bpm - 5) }
+                override fun onPlay() {
+                    android.util.Log.d("MetronomeService", "MediaSession: onPlay received")
+                    startMetronome()
+                }
+                override fun onPause() {
+                    android.util.Log.d("MetronomeService", "MediaSession: onPause received")
+                    stopMetronome()
+                }
+                override fun onSkipToNext() {
+                    android.util.Log.d("MetronomeService", "MediaSession: onSkipToNext received (+5 BPM)")
+                    setBpm(bpm + 5)
+                }
+                override fun onSkipToPrevious() {
+                    android.util.Log.d("MetronomeService", "MediaSession: onSkipToPrevious received (-5 BPM)")
+                    setBpm(bpm - 5)
+                }
+                override fun onFastForward() {
+                    android.util.Log.d("MetronomeService", "MediaSession: onFastForward received (+5 BPM)")
+                    setBpm(bpm + 5)
+                }
+                override fun onRewind() {
+                    android.util.Log.d("MetronomeService", "MediaSession: onRewind received (-5 BPM)")
+                    setBpm(bpm - 5)
+                }
             })
             isActive = true
         }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        android.util.Log.d("MetronomeService", "onStartCommand action: \${intent?.action}")
         when (intent?.action) {
             ACTION_START -> {
                 bpm = intent.getIntExtra(EXTRA_BPM, bpm)
@@ -693,18 +720,28 @@ class MetronomeService : Service() {
                 beatsPerMeasure = intent.getIntExtra(EXTRA_BEATS, beatsPerMeasure)
                 vibrationMs = intent.getLongExtra(EXTRA_VIBRATION_MS, vibrationMs)
                 vibratePhone = intent.getBooleanExtra(EXTRA_VIBRATE_PHONE, false)
+                android.util.Log.i("MetronomeService", "ACTION_START: BPM=\$bpm, beats=\$beatsPerMeasure, vibratePhone=\$vibratePhone")
                 startMetronome()
             }
-            ACTION_STOP -> stopMetronome()
+            ACTION_STOP -> {
+                android.util.Log.i("MetronomeService", "ACTION_STOP received")
+                stopMetronome()
+            }
             ACTION_SET_BPM -> {
-                setBpm(intent.getIntExtra(EXTRA_BPM, bpm))
+                val newBpm = intent.getIntExtra(EXTRA_BPM, bpm)
+                android.util.Log.d("MetronomeService", "ACTION_SET_BPM received: \$newBpm")
+                setBpm(newBpm)
             }
         }
         return START_STICKY
     }
 
     private fun startMetronome() {
-        if (isPlaying) return
+        if (isPlaying) {
+            android.util.Log.d("MetronomeService", "startMetronome ignored: already playing")
+            return
+        }
+        android.util.Log.i("MetronomeService", "startMetronome: starting loop at \$bpm BPM")
         isPlaying = true
         isServiceRunning = true
         currentBeat = 0

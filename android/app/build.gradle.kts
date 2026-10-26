@@ -22,20 +22,22 @@ android {
     }
 
     signingConfigs {
-        create("debugConfig") {
-            storeFile = file("${rootDir}/debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+        val keystoreFile = file("${rootDir}/debug.keystore")
+        if (keystoreFile.exists()) {
+            create("customDebug") {
+                storeFile = keystoreFile
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
         }
     }
 
     buildTypes {
         debug {
             isMinifyEnabled = false
-            val customKeystore = file("${rootDir}/debug.keystore")
-            if (customKeystore.exists()) {
-                signingConfig = signingConfigs.getByName("debugConfig")
+            if (signingConfigs.findByName("customDebug") != null) {
+                signingConfig = signingConfigs.getByName("customDebug")
             }
         }
         release {
@@ -44,9 +46,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            val customKeystore = file("${rootDir}/debug.keystore")
-            if (customKeystore.exists()) {
-                signingConfig = signingConfigs.getByName("debugConfig")
+            if (signingConfigs.findByName("customDebug") != null) {
+                signingConfig = signingConfigs.getByName("customDebug")
+            } else {
+                signingConfig = signingConfigs.getByName("debug")
             }
         }
     }

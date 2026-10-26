@@ -56,5 +56,6 @@ jobs:
           tag_name: latest-apk
           name: "PulseFit Metrónomo APK (Última versión)"
           body: "APK instalable directo para teléfonos Android con soporte nativo de vibración háptica y sincronización con pulsera Samsung Galaxy Fit 3."
+          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

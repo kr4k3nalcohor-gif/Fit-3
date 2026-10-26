@@ -42,6 +42,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             PulseFitNativeApp(
                 onStartService = { bpm, beats, vibrationMs, vibratePhone ->
+                    Log.i("MainActivity", "Starting MetronomeService: BPM=$bpm, beats=$beats, vibration=${vibrationMs}ms, vibratePhone=$vibratePhone")
                     val intent = Intent(this, MetronomeService::class.java).apply {
                         action = MetronomeService.ACTION_START
                         putExtra(MetronomeService.EXTRA_BPM, bpm)
@@ -56,12 +57,14 @@ class MainActivity : ComponentActivity() {
                     }
                 },
                 onStopService = {
+                    Log.i("MainActivity", "Stopping MetronomeService")
                     val intent = Intent(this, MetronomeService::class.java).apply {
                         action = MetronomeService.ACTION_STOP
                     }
                     startService(intent)
                 },
                 onUpdateBpm = { bpm ->
+                    Log.i("MainActivity", "Updating MetronomeService BPM to $bpm")
                     val intent = Intent(this, MetronomeService::class.java).apply {
                         action = MetronomeService.ACTION_SET_BPM
                         putExtra(MetronomeService.EXTRA_BPM, bpm)
@@ -94,6 +97,7 @@ fun PulseFitNativeApp(
             override fun onReceive(ctx: Context?, intent: Intent?) {
                 if (intent?.action == MetronomeService.ACTION_BPM_UPDATED) {
                     val updatedBpm = intent.getIntExtra(MetronomeService.EXTRA_BPM, bpm)
+                    Log.d("MainActivity", "BPM updated via Service broadcast: $updatedBpm")
                     bpm = updatedBpm
                 }
             }
