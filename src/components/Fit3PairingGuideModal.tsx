@@ -35,86 +35,94 @@ export const Fit3PairingGuideModal: React.FC<Fit3PairingGuideModalProps> = ({
           </button>
         </div>
 
-        {/* Section 1: La Interfaz Real de la Galaxy Fit 3 */}
+        {/* Section 1: La Interfaz Real de la Galaxy Fit 3 y Mapeo MediaSession */}
         <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
           <div className="flex items-center gap-2 text-rose-400 text-xs font-bold uppercase tracking-wider">
             <Sparkles className="w-4 h-4" />
-            <span>1. Interfaz Oficial: Controlador Multimedia</span>
+            <span>1. Mapeo Oficial: Android MediaSession</span>
           </div>
           <p className="text-xs text-slate-300 leading-relaxed">
-            La Samsung Galaxy Fit 3 (con sistema FreeRTOS) no permite instalar aplicaciones de terceros directamente en la pulsera. Su forma oficial y probada de controlar el metrónomo es a través de su tarjeta nativa de <strong>Controlador multimedia</strong>:
+            La Samsung Galaxy Fit 3 (con sistema FreeRTOS) se comunica con PulseFit a través del protocolo oficial de <strong>Android MediaSession</strong>. No requiere instalar apps de terceros en la pulsera:
           </p>
           <ul className="text-xs text-slate-300 space-y-2 list-none">
             <li className="flex items-start gap-2 bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
               <div>
-                <strong className="text-white block">Carátula de Álbum en Pantalla</strong>
+                <strong className="text-white block">Botones de Pista (⏭️ y ⏮️) = Ajuste de Tempo (±5 BPM)</strong>
                 <span className="text-slate-400 text-[11px]">
-                  PulseFit envía la carátula gráfica con el tempo actual, los anillos de pulso y el compás, mostrándola directamente en el fondo de la pantalla de tu Fit 3.
+                  Pista siguiente sube <strong>+5 BPM</strong> y pista anterior baja <strong>-5 BPM</strong>. El valor se actualiza en tiempo real tanto en la pantalla de la pulsera como en el móvil.
                 </span>
               </div>
             </li>
             <li className="flex items-start gap-2 bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
               <div>
-                <strong className="text-white block">Línea 1: PulseFit: En Ritmo | Línea 2: BPM: 100</strong>
+                <strong className="text-white block">Botón Central (▶ / ⏸) = Iniciar y Pausar</strong>
                 <span className="text-slate-400 text-[11px]">
-                  El título y subtítulo se adaptan al estándar exacto de One UI Watch para ver tus pulsaciones por minuto al instante al mirar tu muñeca.
+                  Arranca o pausa el bucle rítmico, silenciando el audio y deteniendo la vibración inmediatamente.
                 </span>
               </div>
             </li>
             <li className="flex items-start gap-2 bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
               <div>
-                <strong className="text-white block">Botones Táctiles en la Muñeca</strong>
+                <strong className="text-white block">Carátula de Telemetría Musical</strong>
                 <span className="text-slate-400 text-[11px]">
-                  <strong>|&lt;</strong> resta 5 BPM · <strong>Botón central</strong> pausa/reanuda · <strong>&gt;|</strong> suma 5 BPM.
+                  <strong>Título:</strong> PulseFit: En Ritmo · <strong>Artista:</strong> BPM actual · <strong>Álbum:</strong> Compás activo (ej. 4/4) y pulso actual.
                 </span>
               </div>
             </li>
           </ul>
         </div>
 
-        {/* Section 2: Vibración en la pulsera Fit 3 */}
+        {/* Section 2: Audio en Celular vs Vibración en Fit 3 */}
         <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
           <div className="flex items-center gap-2 text-sky-400 text-xs font-bold uppercase tracking-wider">
             <Vibrate className="w-4 h-4" />
-            <span>2. Vibración Háptica en la Pulsera</span>
+            <span>2. Salida: Sonido en Celular y Vibración en Muñeca</span>
           </div>
           <p className="text-xs text-slate-300 leading-relaxed">
-            Para recibir la vibración en tu muñeca con cada pulso del metrónomo:
+            Separación física óptima para entrenamientos y prácticas musicales:
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
             <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl">
               <div className="font-bold text-white mb-1 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-sky-400" />
-                <span>Vía Bluetooth GATT</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span>Sonido en el Celular</span>
               </div>
               <div className="text-slate-400 text-[11px]">
-                Pulsa &quot;Vincular Bluetooth Galaxy Fit 3&quot; para enviar señales hápticas directas al motor de vibración de la pulsera.
+                El teléfono genera clics acústicos con síntesis AudioTrack PCM de baja latencia (1200 Hz para primer pulso, 820 Hz para pulsos regulares).
               </div>
             </div>
             <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl">
               <div className="font-bold text-white mb-1 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-rose-400" />
-                <span>Vía Android Service (APK)</span>
+                <span>Vibración en la Galaxy Fit 3</span>
               </div>
               <div className="text-slate-400 text-[11px]">
-                El servicio en segundo plano de Android transmite cada cambio de compás con feedback háptico constante tanto al móvil como a los dispositivos emparejados.
+                La pulsera vibra en tu muñeca al ritmo exacto. La vibración en el teléfono viene apagada por defecto para no perturbar el sonido.
               </div>
             </div>
           </div>
         </div>
 
-        {/* Section 3: Instalar como APK */}
+        {/* Section 3: Guía de Uso Paso a Paso */}
         <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
-          <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold uppercase tracking-wider">
+          <div className="flex items-center gap-2 text-amber-400 text-xs font-bold uppercase tracking-wider">
             <Download className="w-4 h-4" />
-            <span>3. Instalar en tu Android</span>
+            <span>3. Guía Rápida de Activación</span>
           </div>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            Abre el menú de tu navegador en tu teléfono (Chrome o Samsung Internet) y pulsa <strong>&quot;Instalar aplicación&quot;</strong>. La app se instalará en tu móvil con icono propio y funcionará a pantalla completa para tus entrenamientos.
-          </p>
+          <ol className="text-xs text-slate-300 space-y-2 list-decimal list-inside">
+            <li>
+              Abre la app <strong>Galaxy Wearable</strong> en tu teléfono y asegúrate de tener el mosaico <strong>Controlador Multimedia</strong> activado en tu Galaxy Fit 3.
+            </li>
+            <li>
+              Abre <strong>PulseFit</strong> en tu móvil y pulsa <strong>&quot;1. INICIAR RITMO (PLAY)&quot;</strong>.
+            </li>
+            <li>
+              En tu Galaxy Fit 3, desliza horizontalmente hasta la tarjeta multimedia: verás la carátula activa y podrás controlar el tempo y la reproducción desde tu muñeca.
+            </li>
+          </ol>
         </div>
 
         {/* Bottom Button */}
