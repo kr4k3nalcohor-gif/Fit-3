@@ -53,7 +53,8 @@ export const GalaxyFit3Simulator: React.FC<GalaxyFit3SimulatorProps> = ({
     try {
       const url = generateCaratulaDataUrl(bpm, timeSignature.beats, currentBeat, isPlaying);
       setCaratulaUrl(url);
-    } catch {
+    } catch (caratulaError: unknown) {
+      console.warn('Simulator caratula generation fallback:', caratulaError);
       setCaratulaUrl('/caratula-fit3.svg');
     }
   }, [bpm, timeSignature.beats, isPlaying, currentBeat]);

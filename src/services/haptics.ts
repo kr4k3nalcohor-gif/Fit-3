@@ -50,8 +50,8 @@ class HapticsService {
         } else {
           navigator.vibrate(baseMs);
         }
-      } catch {
-        // Ignore vibration restrictions if tab lost focus or browser denies
+      } catch (vibrateError: unknown) {
+        console.debug('Phone vibration denied or unsupported in current context:', vibrateError);
       }
     }
 
@@ -60,8 +60,8 @@ class HapticsService {
       try {
         const alertLevel = isAccent ? 2 : 1; // 2 = High Alert, 1 = Mild Alert
         this.alertCharacteristic.writeValue(new Uint8Array([alertLevel]));
-      } catch {
-        // Silent catch for GATT write
+      } catch (gattWriteError: unknown) {
+        console.warn('GATT alert characteristic write failed:', gattWriteError);
       }
     }
   }
@@ -77,13 +77,17 @@ class HapticsService {
         } else {
           navigator.vibrate(baseMs);
         }
-      } catch {}
+      } catch (vibrateError: unknown) {
+        console.debug('Haptic test vibration failed:', vibrateError);
+      }
     }
 
     if (this.alertCharacteristic) {
       try {
         this.alertCharacteristic.writeValue(new Uint8Array([isAccent ? 2 : 1]));
-      } catch {}
+      } catch (gattWriteError: unknown) {
+        console.warn('Haptic test GATT alert write failed:', gattWriteError);
+      }
     }
   }
 
@@ -114,8 +118,8 @@ class HapticsService {
         try {
           const service = await server.getPrimaryService('immediate_alert');
           this.alertCharacteristic = await service.getCharacteristic(0x2a06);
-        } catch {
-          // service not exposed, device still paired for presence
+        } catch (serviceDiscoveryError: unknown) {
+          console.debug('Immediate Alert service not exposed on device; paired for media controller presence:', serviceDiscoveryError);
         }
       }
 

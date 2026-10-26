@@ -49,8 +49,8 @@ class MediaSessionManager {
       navigator.mediaSession.setActionHandler('seekbackward', () => {
         this.handlers?.onPreviousTrack();
       });
-    } catch {
-      // Browser might ignore some action handlers
+    } catch (handlerError: unknown) {
+      console.debug('MediaSession action handler registration note:', handlerError);
     }
   }
 
@@ -67,7 +67,8 @@ class MediaSessionManager {
       this.lastPlaying = isPlaying;
       try {
         this.lastCaratulaUrl = generateCaratulaDataUrl(bpm, beats, currentBeat, isPlaying);
-      } catch {
+      } catch (canvasError: unknown) {
+        console.warn('Caratula generation failed, falling back to static SVG:', canvasError);
         this.lastCaratulaUrl = '/caratula-fit3.svg';
       }
     }
@@ -87,8 +88,8 @@ class MediaSessionManager {
       });
 
       navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
-    } catch {
-      // Ignore if metadata update fails
+    } catch (metadataError: unknown) {
+      console.debug('MediaSession metadata update ignored by platform:', metadataError);
     }
   }
 }

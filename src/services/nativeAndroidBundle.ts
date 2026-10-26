@@ -19,37 +19,53 @@ jobs:
   build:
     name: Build Android Debug APK
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java JDK 21 (Temurin)
+      - name: Set up Java JDK 17 (Temurin)
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
-          cache: 'gradle'
+          java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Create debug keystore
+        working-directory: ./android
         run: |
-          keytool -genkey -v -keystore android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Grant execute permission for gradlew
+        working-directory: ./android
+        run: chmod +x gradlew
 
       - name: Build Debug APK with Gradle
         working-directory: ./android
-        run: |
-          chmod +x gradlew || true
-          gradle assembleDebug --stacktrace || (gradle wrapper && ./gradlew assembleDebug)
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: PulseFit-debug-apk
-          path: android/app/build/outputs/apk/debug/*.apk
+          path: android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: warn
           retention-days: 14
+
+      - name: Release APK
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: android/app/build/outputs/apk/**/*.apk
+          tag_name: latest-apk
+          name: "PulseFit Metrónomo APK (Última versión)"
+          body: "APK instalable directo para teléfonos Android con soporte nativo de vibración háptica y sincronización con pulsera Samsung Galaxy Fit 3."
+        env:
+          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
 `
   );
 
@@ -148,15 +164,21 @@ android {
     buildTypes {
         debug {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debugConfig")
+            val customKeystore = file("\${rootDir}/debug.keystore")
+            if (customKeystore.exists()) {
+                signingConfig = signingConfigs.getByName("debugConfig")
+            }
         }
         release {
-            isMinifyEnabled = true
+            isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debugConfig")
+            val customKeystore = file("\${rootDir}/debug.keystore")
+            if (customKeystore.exists()) {
+                signingConfig = signingConfigs.getByName("debugConfig")
+            }
         }
     }
 
@@ -421,7 +443,13 @@ fun PulseFitNativeApp(
             context.registerReceiver(receiver, filter)
         }
         onDispose {
-            try { context.unregisterReceiver(receiver) } catch (e: Exception) {}
+            try {
+                context.unregisterReceiver(receiver)
+            } catch (unregisteredException: IllegalArgumentException) {
+                android.util.Log.d("MainActivity", "Receiver already unregistered", unregisteredException)
+            } catch (receiverException: Exception) {
+                android.util.Log.w("MainActivity", "Error unregistering receiver", receiverException)
+            }
         }
     }
 
@@ -628,14 +656,18 @@ class MetronomeService : Service() {
                 .build()
 
             audioTrack?.play()
-        } catch (e: Exception) {}
+        } catch (audioInitException: Exception) {
+            android.util.Log.e("MetronomeService", "Error starting AudioTrack", audioInitException)
+        }
     }
 
     private fun playBeatAudio(isAccent: Boolean) {
         try {
             val buffer = if (isAccent) accentPcm else regularPcm
             audioTrack?.write(buffer, 0, buffer.size)
-        } catch (e: Exception) {}
+        } catch (audioWriteException: Exception) {
+            android.util.Log.w("MetronomeService", "Error writing audio buffer", audioWriteException)
+        }
     }
 
     private fun initMediaSession() {
@@ -773,7 +805,9 @@ class MetronomeService : Service() {
         try {
             audioTrack?.stop()
             audioTrack?.release()
-        } catch (e: Exception) {}
+        } catch (audioReleaseException: Exception) {
+            android.util.Log.w("MetronomeService", "Error releasing AudioTrack", audioReleaseException)
+        }
         audioTrack = null
         mediaSession?.release()
     }

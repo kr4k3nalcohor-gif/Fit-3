@@ -11,6 +11,8 @@ jobs:
   build:
     name: Build Android Debug APK
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -47,12 +49,12 @@ jobs:
           retention-days: 14
 
       - name: Release APK
-        if: github.event_name == 'workflow_dispatch'
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
           files: android/app/build/outputs/apk/**/*.apk
-          tag_name: v1.0.0-apk
-          name: "PulseFit Metrónomo APK v1.0.0"
-          body: "APK instalable directo para Android con soporte nativo de vibración háptica y sincronización con pulsera Samsung Galaxy Fit 3."
+          tag_name: latest-apk
+          name: "PulseFit Metrónomo APK (Última versión)"
+          body: "APK instalable directo para teléfonos Android con soporte nativo de vibración háptica y sincronización con pulsera Samsung Galaxy Fit 3."
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

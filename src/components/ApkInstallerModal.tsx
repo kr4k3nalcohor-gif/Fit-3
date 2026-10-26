@@ -51,7 +51,8 @@ export const ApkInstallerModal: React.FC<ApkInstallerModalProps> = ({
     // Detect if inside an iframe
     try {
       setIsInIframe(window.self !== window.top);
-    } catch {
+    } catch (crossOriginError: unknown) {
+      console.debug('Window cross-origin access restricted, treating as iframe:', crossOriginError);
       setIsInIframe(true);
     }
 
@@ -66,7 +67,9 @@ export const ApkInstallerModal: React.FC<ApkInstallerModalProps> = ({
         },
       })
         .then((url) => setQrDataUrl(url))
-        .catch(() => {});
+        .catch((qrError: unknown) => {
+          console.debug('QR code generation note:', qrError);
+        });
     }
   }, [publicUrl]);
 
@@ -77,8 +80,8 @@ export const ApkInstallerModal: React.FC<ApkInstallerModalProps> = ({
       await navigator.clipboard.writeText(publicUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
-    } catch {
-      // Fallback
+    } catch (copyError: unknown) {
+      console.warn('Clipboard writeText failed:', copyError);
     }
   };
 
@@ -386,31 +389,40 @@ export const ApkInstallerModal: React.FC<ApkInstallerModalProps> = ({
               </p>
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 <a
-                  href="https://github.com/kr4k3nalcohor-gif/Fit-3/actions/runs/40106911652"
+                  href="https://github.com/kr4k3nalcohor-gif/Fit-3/releases/latest/download/app-debug.apk"
                   target="_blank"
                   rel="noreferrer"
-                  className="py-2 px-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold rounded-xl shadow-md shadow-emerald-500/20 flex items-center gap-1.5 cursor-pointer"
+                  className="py-2.5 px-3.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold rounded-xl shadow-md shadow-emerald-500/20 flex items-center gap-1.5 cursor-pointer text-xs"
                 >
                   <Download className="w-4 h-4" />
-                  <span>Descargar APK Compilado (Run #3)</span>
+                  <span>Descargar APK Directo (.apk)</span>
                 </a>
                 <a
-                  href="https://github.com/kr4k3nalcohor-gif/Fit-3"
+                  href="https://github.com/kr4k3nalcohor-gif/Fit-3/releases"
                   target="_blank"
                   rel="noreferrer"
-                  className="py-2 px-3 bg-slate-900 hover:bg-slate-850 text-sky-400 font-bold rounded-xl border border-slate-750 flex items-center gap-1.5 cursor-pointer"
+                  className="py-2.5 px-3 bg-slate-900 hover:bg-slate-850 text-white font-bold rounded-xl border border-slate-750 flex items-center gap-1.5 cursor-pointer text-xs"
                 >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Abrir Repositorio</span>
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Ver Versiones (Releases)</span>
                 </a>
                 <a
                   href="https://github.com/kr4k3nalcohor-gif/Fit-3/actions"
                   target="_blank"
                   rel="noreferrer"
-                  className="py-2 px-3 bg-slate-900 hover:bg-slate-850 text-slate-300 font-bold rounded-xl border border-slate-750 flex items-center gap-1.5 cursor-pointer"
+                  className="py-2.5 px-3 bg-slate-900 hover:bg-slate-850 text-slate-300 font-bold rounded-xl border border-slate-750 flex items-center gap-1.5 cursor-pointer text-xs"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <ExternalLink className="w-3.5 h-3.5 text-sky-400" />
                   <span>Historial Actions</span>
+                </a>
+                <a
+                  href="https://github.com/kr4k3nalcohor-gif/Fit-3"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="py-2.5 px-3 bg-slate-900 hover:bg-slate-850 text-sky-400 font-bold rounded-xl border border-slate-750 flex items-center gap-1.5 cursor-pointer text-xs"
+                >
+                  <FileCode className="w-3.5 h-3.5" />
+                  <span>kr4k3nalcohor-gif/Fit-3</span>
                 </a>
               </div>
             </div>

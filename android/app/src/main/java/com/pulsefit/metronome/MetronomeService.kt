@@ -15,6 +15,7 @@ import android.os.IBinder
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.util.Log
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
@@ -28,6 +29,7 @@ import kotlinx.coroutines.launch
 
 class MetronomeService : Service() {
 
+    private val TAG = "MetronomeService"
     private val CHANNEL_ID = "pulsefit_running_channel"
     private val NOTIF_ID = 1001
 
@@ -131,8 +133,8 @@ class MetronomeService : Service() {
                 .build()
 
             audioTrack?.play()
-        } catch (e: Exception) {
-            e.printStackTrace()
+        } catch (audioInitException: Exception) {
+            Log.e(TAG, "Error initializing or starting AudioTrack", audioInitException)
         }
     }
 
@@ -140,8 +142,8 @@ class MetronomeService : Service() {
         try {
             val buffer = if (isAccent) accentPcm else regularPcm
             audioTrack?.write(buffer, 0, buffer.size)
-        } catch (e: Exception) {
-            e.printStackTrace()
+        } catch (audioWriteException: Exception) {
+            Log.w(TAG, "Error writing audio buffer to AudioTrack", audioWriteException)
         }
     }
 
@@ -336,8 +338,8 @@ class MetronomeService : Service() {
         try {
             audioTrack?.stop()
             audioTrack?.release()
-        } catch (e: Exception) {
-            e.printStackTrace()
+        } catch (audioReleaseException: Exception) {
+            Log.w(TAG, "Error releasing AudioTrack resources", audioReleaseException)
         }
         audioTrack = null
         mediaSession?.release()

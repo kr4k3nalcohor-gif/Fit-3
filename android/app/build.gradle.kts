@@ -33,15 +33,21 @@ android {
     buildTypes {
         debug {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debugConfig")
+            val customKeystore = file("${rootDir}/debug.keystore")
+            if (customKeystore.exists()) {
+                signingConfig = signingConfigs.getByName("debugConfig")
+            }
         }
         release {
-            isMinifyEnabled = true
+            isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debugConfig")
+            val customKeystore = file("${rootDir}/debug.keystore")
+            if (customKeystore.exists()) {
+                signingConfig = signingConfigs.getByName("debugConfig")
+            }
         }
     }
 

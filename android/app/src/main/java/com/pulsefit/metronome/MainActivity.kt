@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -106,8 +107,10 @@ fun PulseFitNativeApp(
         onDispose {
             try {
                 context.unregisterReceiver(receiver)
-            } catch (e: Exception) {
-                // Ignore
+            } catch (unregisteredException: IllegalArgumentException) {
+                Log.d("MainActivity", "BroadcastReceiver was already unregistered", unregisteredException)
+            } catch (receiverException: Exception) {
+                Log.w("MainActivity", "Error unregistering receiver", receiverException)
             }
         }
     }

@@ -81,8 +81,8 @@ class AudioEngine {
       this.silentOsc.connect(this.silentGain);
       this.silentGain.connect(this.audioCtx.destination);
       this.silentOsc.start();
-    } catch {
-      // Ignore keepalive error if audio context not ready
+    } catch (keepAliveError: unknown) {
+      console.debug('Audio keepalive initialization skipped:', keepAliveError);
     }
   }
 
@@ -91,13 +91,17 @@ class AudioEngine {
       try {
         this.silentOsc.stop();
         this.silentOsc.disconnect();
-      } catch {}
+      } catch (oscStopError: unknown) {
+        console.debug('Audio keepalive oscillator stop notice:', oscStopError);
+      }
       this.silentOsc = null;
     }
     if (this.silentGain) {
       try {
         this.silentGain.disconnect();
-      } catch {}
+      } catch (gainDisconnectError: unknown) {
+        console.debug('Audio keepalive gain disconnect notice:', gainDisconnectError);
+      }
       this.silentGain = null;
     }
   }
