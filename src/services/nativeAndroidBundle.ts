@@ -198,13 +198,15 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
@@ -832,6 +834,13 @@ class MetronomeService : Service() {
                 .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, "Compás \$beatsPerMeasure/4 • Pulso \${currentBeat + 1}")
                 .build()
         )
+    }
+
+    private fun updateNotification() {
+        if (isPlaying) {
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            manager?.notify(NOTIF_ID, buildNotification())
+        }
     }
 
     private fun buildNotification(): Notification {

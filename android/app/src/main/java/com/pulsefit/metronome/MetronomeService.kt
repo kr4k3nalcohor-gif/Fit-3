@@ -318,6 +318,13 @@ class MetronomeService : Service() {
         )
     }
 
+    private fun updateNotification() {
+        if (isPlaying) {
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            manager?.notify(NOTIF_ID, buildNotification())
+        }
+    }
+
     private fun buildNotification(): Notification {
         val pendingIntent = PendingIntent.getActivity(
             this,
