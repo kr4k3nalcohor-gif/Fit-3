@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -18,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Stop
@@ -100,6 +102,17 @@ fun PulseFitNativeApp(
     var vibratePhone by remember { mutableStateOf(true) } // Default: True for guaranteed physical haptic feedback
     var showTempoDialog by remember { mutableStateOf(false) }
     var showBeatsDialog by remember { mutableStateOf(false) }
+    var showWearableGuideDialog by remember { mutableStateOf(false) }
+
+    val vibrator = remember {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val manager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? android.os.VibratorManager
+            manager?.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator
+        }
+    }
 
     // Request Bluetooth and Notification runtime permissions for Galaxy Fit 3
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -262,7 +275,19 @@ fun PulseFitNativeApp(
 
                         // Button to immediately test vibration on Galaxy Fit 3!
                         Button(
-                            onClick = onTestVibration,
+                            onClick = {
+                                try {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                        vibrator?.vibrate(android.os.VibrationEffect.createOneShot(120, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+                                    } else {
+                                        @Suppress("DEPRECATION")
+                                        vibrator?.vibrate(120)
+                                    }
+                                } catch (e: Exception) {
+                                    Log.d("MainActivity", "Local vibrator error", e)
+                                }
+                                onTestVibration()
+                            },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF22C55E)),
                             shape = RoundedCornerShape(10.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
@@ -305,6 +330,45 @@ fun PulseFitNativeApp(
                                 uncheckedTrackColor = Color(0xFF334155)
                             )
                         )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Samsung Fit 3 Setup & Helper Buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { showWearableGuideDialog = true },
+                            modifier = Modifier.weight(1f).height(34.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8))
+                        ) {
+                            Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("¿No vibra la Fit 3?", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = {
+                                val wearableIntent = context.packageManager.getLaunchIntentForPackage("com.samsung.android.app.watchmanager")
+                                if (wearableIntent != null) {
+                                    context.startActivity(wearableIntent)
+                                } else {
+                                    context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+                                }
+                            },
+                            modifier = Modifier.weight(1f).height(34.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B), contentColor = Color(0xFFFB7185))
+                        ) {
+                            Icon(Icons.Default.Watch, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Galaxy Wearable", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
@@ -498,6 +562,66 @@ fun PulseFitNativeApp(
                 confirmButton = {
                     TextButton(onClick = { showBeatsDialog = false }) {
                         Text("Cerrar")
+                    }
+                }
+            )
+        }
+
+        // Wearable Fit 3 Setup Guide Dialog
+        if (showWearableGuideDialog) {
+            AlertDialog(
+                onDismissRequest = { showWearableGuideDialog = false },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Watch, contentDescription = null, tint = Color(0xFFFB7185), modifier = Modifier.size(24.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Vibración en Samsung Fit 3", fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                    }
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            "La Samsung Galaxy Fit 3 tiene un sistema cerrado (FreeRTOS) y requiere que habilites las alertas en la app de Samsung:",
+                            fontSize = 12.sp,
+                            color = Color(0xFFCBD5E1)
+                        )
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("1. Activar PulseFit en Galaxy Wearable", fontWeight = FontWeight.Bold, color = Color(0xFF38BDF8), fontSize = 11.sp)
+                                Text("Abre la app Galaxy Wearable en tu celular > Ajustes de pulsera > Notificaciones > Notificaciones de aplicaciones > Activa 'PulseFit'.", fontSize = 11.sp, color = Color.White)
+
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("2. Pantalla del celular", fontWeight = FontWeight.Bold, color = Color(0xFF38BDF8), fontSize = 11.sp)
+                                Text("Samsung silencia la pulsera si la pantalla del celular está encendida. Para probar, pulsa 'Probar' o inicia el ritmo y bloquea la pantalla de tu celular.", fontSize = 11.sp, color = Color.White)
+
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("3. Desactivar Modo Silencio en la Fit 3", fontWeight = FontWeight.Bold, color = Color(0xFF38BDF8), fontSize = 11.sp)
+                                Text("Desliza abajo en tu Fit 3 y confirma que no esté en modo 'No molestar' o 'Silencio'.", fontSize = 11.sp, color = Color.White)
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            val wearableIntent = context.packageManager.getLaunchIntentForPackage("com.samsung.android.app.watchmanager")
+                            if (wearableIntent != null) {
+                                context.startActivity(wearableIntent)
+                            } else {
+                                context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF38BDF8))
+                    ) {
+                        Text("Abrir Galaxy Wearable", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showWearableGuideDialog = false }) {
+                        Text("Entendido", color = Color.White)
                     }
                 }
             )

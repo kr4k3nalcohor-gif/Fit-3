@@ -55,11 +55,21 @@ Durante la reproducción, la tarjeta multimedia de la Galaxy Fit 3 muestra infor
 
 ---
 
-### 5. Configuración Rápida en la app Galaxy Wearable
-1. Abre la aplicación **Galaxy Wearable** en tu teléfono Android.
-2. Ve a **Mosaicos (Tiles)** o **Widgets**.
-3. Asegúrate de añadir el mosaico **Controlador Multimedia** en la lista activa de la pulsera.
-4. Al abrir PulseFit y presionar Iniciar, desliza en tu Galaxy Fit 3 hasta el controlador multimedia para ver la carátula activa y controlar el ritmo.
+### 5. Configuración Imprescindible en la app Galaxy Wearable (Para que vibre la Fit 3)
+
+La **Samsung Galaxy Fit 3** utiliza un sistema cerrado (FreeRTOS) gestionado por la aplicación **Samsung Galaxy Wearable**. Para que el motor háptico vibre con PulseFit, sigue estos pasos:
+
+1. **Activar Notificaciones de PulseFit**:
+   - Abre la app **Galaxy Wearable** en tu teléfono móvil.
+   - Ve a **Ajustes de la pulsera** > **Notificaciones** > **Notificaciones de aplicaciones**.
+   - Busca **PulseFit** en la lista y **activa su interruptor**. *(Samsung desactiva por defecto las apps instaladas por primera vez)*.
+2. **Ajuste de Pantalla del Celular**:
+   - En **Galaxy Wearable** > **Notificaciones**, comprueba la opción *"Silenciar en la pulsera con el teléfono en uso"*.
+   - Si está activada, Samsung no hace vibrar la pulsera mientras tengas la pantalla del teléfono encendida. Para probar, **bloquea la pantalla de tu teléfono** tras pulsar "Iniciar ritmo" o "Probar".
+3. **Mosaico Controlador Multimedia**:
+   - En **Galaxy Wearable** > **Mosaicos (Tiles)**, añade el **Controlador Multimedia** para cambiar tempo (±5 BPM) y pausar/iniciar directamente desde la pantalla de la pulsera.
+4. **Verificar Modo Silencio en la Fit 3**:
+   - Desliza hacia abajo desde la pantalla principal de la pulsera y confirma que no esté activo el modo *"No Molestar"* ni *"Silencio"*.
 
 ---
 

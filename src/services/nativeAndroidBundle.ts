@@ -376,6 +376,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -387,6 +388,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Stop
@@ -465,6 +467,17 @@ fun PulseFitNativeApp(
     var beats by remember { mutableStateOf(4) }
     var vibrationMs by remember { mutableStateOf(85L) }
     var vibratePhone by remember { mutableStateOf(true) }
+    var showWearableGuideDialog by remember { mutableStateOf(false) }
+
+    val vibrator = remember {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val manager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? android.os.VibratorManager
+            manager?.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator
+        }
+    }
 
     // Request Bluetooth and Notification runtime permissions for Galaxy Fit 3
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -570,7 +583,19 @@ fun PulseFitNativeApp(
                                 }
                             }
                             Button(
-                                onClick = onTestVibration,
+                                onClick = {
+                                    try {
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                            vibrator?.vibrate(VibrationEffect.createOneShot(120, VibrationEffect.DEFAULT_AMPLITUDE))
+                                        } else {
+                                            @Suppress("DEPRECATION")
+                                            vibrator?.vibrate(120)
+                                        }
+                                    } catch (e: Exception) {
+                                        android.util.Log.d("MainActivity", "Local vibrator error", e)
+                                    }
+                                    onTestVibration()
+                                },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF22C55E)),
                                 shape = RoundedCornerShape(10.dp),
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
@@ -594,6 +619,44 @@ fun PulseFitNativeApp(
                         ) {
                             Text("Vibrar también en el celular", color = Color.White, fontSize = 11.sp)
                             Switch(checked = vibratePhone, onCheckedChange = { vibratePhone = it })
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { showWearableGuideDialog = true },
+                                modifier = Modifier.weight(1f).height(34.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8))
+                            ) {
+                                Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("¿No vibra la Fit 3?", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            Button(
+                                onClick = {
+                                    val wearableIntent = context.packageManager.getLaunchIntentForPackage("com.samsung.android.app.watchmanager")
+                                    if (wearableIntent != null) {
+                                        context.startActivity(wearableIntent)
+                                    } else {
+                                        context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+                                    }
+                                },
+                                modifier = Modifier.weight(1f).height(34.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B), contentColor = Color(0xFFFB7185))
+                            ) {
+                                Icon(Icons.Default.Watch, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Galaxy Wearable", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
@@ -639,6 +702,65 @@ fun PulseFitNativeApp(
             }
             Spacer(Modifier.height(10.dp))
         }
+
+        if (showWearableGuideDialog) {
+            AlertDialog(
+                onDismissRequest = { showWearableGuideDialog = false },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Watch, contentDescription = null, tint = Color(0xFFFB7185), modifier = Modifier.size(24.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Vibración en Samsung Fit 3", fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                    }
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            "La Samsung Galaxy Fit 3 tiene un sistema cerrado (FreeRTOS) y requiere que habilites las alertas en la app de Samsung:",
+                            fontSize = 12.sp,
+                            color = Color(0xFFCBD5E1)
+                        )
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("1. Activar PulseFit en Galaxy Wearable", fontWeight = FontWeight.Bold, color = Color(0xFF38BDF8), fontSize = 11.sp)
+                                Text("Abre la app Galaxy Wearable en tu celular > Ajustes de pulsera > Notificaciones > Notificaciones de aplicaciones > Activa 'PulseFit'.", fontSize = 11.sp, color = Color.White)
+
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("2. Pantalla del celular", fontWeight = FontWeight.Bold, color = Color(0xFF38BDF8), fontSize = 11.sp)
+                                Text("Samsung silencia la pulsera si la pantalla del celular está encendida. Para probar, pulsa 'Probar' o inicia el ritmo y bloquea la pantalla de tu celular.", fontSize = 11.sp, color = Color.White)
+
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("3. Desactivar Modo Silencio en la Fit 3", fontWeight = FontWeight.Bold, color = Color(0xFF38BDF8), fontSize = 11.sp)
+                                Text("Desliza abajo en tu Fit 3 y confirma que no esté en modo 'No molestar' o 'Silencio'.", fontSize = 11.sp, color = Color.White)
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            val wearableIntent = context.packageManager.getLaunchIntentForPackage("com.samsung.android.app.watchmanager")
+                            if (wearableIntent != null) {
+                                context.startActivity(wearableIntent)
+                            } else {
+                                context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF38BDF8))
+                    ) {
+                        Text("Abrir Galaxy Wearable", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showWearableGuideDialog = false }) {
+                        Text("Entendido", color = Color.White)
+                    }
+                }
+            )
+        }
     }
 }
 `
@@ -666,6 +788,10 @@ import java.util.UUID
 class MetronomeService : Service() {
     private val CHANNEL_ID = "pulsefit_running_channel"
     private val NOTIF_ID = 1001
+
+    private val HAPTIC_CHANNEL_ID = "pulsefit_fit3_haptic_channel"
+    private val HAPTIC_BASE_ID = 2000
+    private var hapticCounter = 0
 
     private val IAS_SERVICE_UUID = UUID.fromString("00001802-0000-1000-8000-00805f9b34fb")
     private val ALERT_LEVEL_UUID = UUID.fromString("00002a06-0000-1000-8000-00805f9b34fb")
@@ -894,9 +1020,9 @@ class MetronomeService : Service() {
                 android.util.Log.i("MetronomeService", "ACTION_TEST_VIBRATION received: triggering test haptic pattern")
                 scope.launch {
                     triggerHaptic(0)
-                    delay(200)
+                    delay(350)
                     triggerHaptic(1)
-                    delay(200)
+                    delay(350)
                     triggerHaptic(2)
                 }
             }
@@ -952,6 +1078,38 @@ class MetronomeService : Service() {
         sendBroadcast(broadcastIntent)
     }
 
+    private fun sendFit3WearableAlert(isFirst: Boolean) {
+        try {
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+            hapticCounter = (hapticCounter + 1) % 5
+            val notifId = HAPTIC_BASE_ID + hapticCounter
+
+            val vibrationPattern = if (isFirst) {
+                longArrayOf(0, 200, 60, 200)
+            } else {
+                longArrayOf(0, 120)
+            }
+
+            val alertNotif = NotificationCompat.Builder(this, HAPTIC_CHANNEL_ID)
+                .setContentTitle(if (isFirst) "PulseFit · ¡Acento!" else "PulseFit · Pulso")
+                .setContentText("Ritmo \$bpm BPM · Pulso \${currentBeat + 1}")
+                .setSmallIcon(android.R.drawable.ic_lock_idle_charging)
+                .setPriority(NotificationCompat.PRIORITY_MAX)
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setOnlyAlertOnce(false)
+                .setWhen(System.currentTimeMillis())
+                .setVibrate(vibrationPattern)
+                .setTimeoutAfter(500)
+                .build()
+
+            manager.notify(notifId, alertNotif)
+            android.util.Log.d("MetronomeService", "Sent high-priority Fit 3 haptic notification (ID=\$notifId, isFirst=\$isFirst)")
+        } catch (e: Exception) {
+            android.util.Log.w("MetronomeService", "Error sending Fit 3 wearable alert notification", e)
+        }
+    }
+
     private fun triggerFit3Haptic(isFirst: Boolean) {
         val gatt = bluetoothGatt ?: return
         val characteristic = alertCharacteristic ?: return
@@ -974,26 +1132,33 @@ class MetronomeService : Service() {
         }
     }
 
+    private fun triggerPhoneHaptic(isAccent: Boolean) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (isAccent) {
+                val timings = longArrayOf(0, (vibrationMs * 1.3).toLong(), 35, (vibrationMs * 0.9).toLong())
+                val amplitudes = intArrayOf(0, 255, 0, 200)
+                vibrator?.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
+            } else {
+                vibrator?.vibrate(VibrationEffect.createOneShot(vibrationMs, VibrationEffect.DEFAULT_AMPLITUDE))
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator?.vibrate(if (isAccent) vibrationMs * 2 else vibrationMs)
+        }
+    }
+
     private fun triggerHaptic(beat: Int) {
         val isFirst = beat == 0
 
-        // 1. Send physical vibration to Samsung Galaxy Fit 3
+        // 1. Samsung Galaxy Wearable Notification Mirroring (Dispatches physical wrist vibration to Galaxy Fit 3 FreeRTOS)
+        sendFit3WearableAlert(isFirst)
+
+        // 2. Direct BLE Immediate Alert Service write (best effort)
         triggerFit3Haptic(isFirst)
 
-        // 2. Hardware vibrator on phone (if enabled)
+        // 3. Hardware vibrator on phone (if enabled)
         if (vibratePhone) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                if (isFirst) {
-                    val timings = longArrayOf(0, (vibrationMs * 1.3).toLong(), 35, (vibrationMs * 0.9).toLong())
-                    val amplitudes = intArrayOf(0, 255, 0, 200)
-                    vibrator?.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
-                } else {
-                    vibrator?.vibrate(VibrationEffect.createOneShot(vibrationMs, VibrationEffect.DEFAULT_AMPLITUDE))
-                }
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator?.vibrate(if (isFirst) vibrationMs * 2 else vibrationMs)
-            }
+            triggerPhoneHaptic(isFirst)
         }
     }
 
@@ -1033,9 +1198,23 @@ class MetronomeService : Service() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+
             val channel = NotificationChannel(CHANNEL_ID, "PulseFit Servicio", NotificationManager.IMPORTANCE_LOW)
-            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-            manager?.createNotificationChannel(channel)
+            manager.createNotificationChannel(channel)
+
+            val hapticChannel = NotificationChannel(
+                HAPTIC_CHANNEL_ID,
+                "PulseFit Vibración Pulsera Fit 3",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Canal prioritario para enviar pulsos de vibración a la pulsera Samsung Galaxy Fit 3"
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 180, 50, 180)
+                setSound(null, null)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            }
+            manager.createNotificationChannel(hapticChannel)
         }
     }
 

@@ -41,6 +41,11 @@ class MetronomeService : Service() {
     private val CHANNEL_ID = "pulsefit_running_channel"
     private val NOTIF_ID = 1001
 
+    // Dedicated high-priority notification channel to trigger physical vibration on Samsung Galaxy Fit 3
+    private val HAPTIC_CHANNEL_ID = "pulsefit_fit3_haptic_channel"
+    private val HAPTIC_BASE_ID = 2000
+    private var hapticCounter = 0
+
     // Bluetooth Immediate Alert Service (IAS) UUIDs for wearable vibration
     private val IAS_SERVICE_UUID = UUID.fromString("00001802-0000-1000-8000-00805f9b34fb")
     private val ALERT_LEVEL_UUID = UUID.fromString("00002a06-0000-1000-8000-00805f9b34fb")
@@ -285,7 +290,7 @@ class MetronomeService : Service() {
                 currentBpm = bpm
                 beatsPerMeasure = intent.getIntExtra(EXTRA_BEATS, beatsPerMeasure)
                 vibrationMs = intent.getLongExtra(EXTRA_VIBRATION_MS, vibrationMs)
-                vibratePhone = intent.getBooleanExtra(EXTRA_VIBRATE_PHONE, false)
+                vibratePhone = intent.getBooleanExtra(EXTRA_VIBRATE_PHONE, true)
                 Log.i(TAG, "ACTION_START: BPM=$bpm, beats=$beatsPerMeasure, vibrationMs=$vibrationMs, vibratePhone=$vibratePhone")
                 startMetronome()
             }
@@ -302,9 +307,9 @@ class MetronomeService : Service() {
                 Log.i(TAG, "ACTION_TEST_VIBRATION received: triggering test haptic pattern on Fit 3 and phone")
                 scope.launch {
                     triggerHaptic(0)
-                    delay(200)
+                    delay(350)
                     triggerHaptic(1)
-                    delay(200)
+                    delay(350)
                     triggerHaptic(2)
                 }
             }
@@ -371,6 +376,38 @@ class MetronomeService : Service() {
         sendBroadcast(broadcastIntent)
     }
 
+    private fun sendFit3WearableAlert(isFirst: Boolean) {
+        try {
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+            hapticCounter = (hapticCounter + 1) % 5
+            val notifId = HAPTIC_BASE_ID + hapticCounter
+
+            val vibrationPattern = if (isFirst) {
+                longArrayOf(0, 200, 60, 200)
+            } else {
+                longArrayOf(0, 120)
+            }
+
+            val alertNotif = NotificationCompat.Builder(this, HAPTIC_CHANNEL_ID)
+                .setContentTitle(if (isFirst) "PulseFit · ¡Acento!" else "PulseFit · Pulso")
+                .setContentText("Ritmo $bpm BPM · Pulso ${currentBeat + 1}")
+                .setSmallIcon(android.R.drawable.ic_lock_idle_charging)
+                .setPriority(NotificationCompat.PRIORITY_MAX)
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setOnlyAlertOnce(false)
+                .setWhen(System.currentTimeMillis())
+                .setVibrate(vibrationPattern)
+                .setTimeoutAfter(500)
+                .build()
+
+            manager.notify(notifId, alertNotif)
+            Log.d(TAG, "Sent high-priority Fit 3 haptic notification (ID=$notifId, isFirst=$isFirst)")
+        } catch (e: Exception) {
+            Log.w(TAG, "Error sending Fit 3 wearable alert notification", e)
+        }
+    }
+
     private fun triggerFit3Haptic(isFirst: Boolean) {
         val gatt = bluetoothGatt ?: return
         val characteristic = alertCharacteristic ?: return
@@ -393,26 +430,33 @@ class MetronomeService : Service() {
         }
     }
 
+    private fun triggerPhoneHaptic(isAccent: Boolean) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (isAccent) {
+                val timings = longArrayOf(0, (vibrationMs * 1.3).toLong(), 35, (vibrationMs * 0.9).toLong())
+                val amplitudes = intArrayOf(0, 255, 0, 200)
+                vibrator?.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
+            } else {
+                vibrator?.vibrate(VibrationEffect.createOneShot(vibrationMs, VibrationEffect.DEFAULT_AMPLITUDE))
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator?.vibrate(if (isAccent) vibrationMs * 2 else vibrationMs)
+        }
+    }
+
     private fun triggerHaptic(beat: Int) {
         val isFirst = beat == 0 && accentFirstBeat
 
-        // 1. Send physical vibration to Samsung Galaxy Fit 3 via BLE Immediate Alert
+        // 1. Samsung Galaxy Wearable Notification Mirroring (Dispatches physical wrist vibration to Galaxy Fit 3 FreeRTOS)
+        sendFit3WearableAlert(isFirst)
+
+        // 2. Direct BLE Immediate Alert Service write (best effort)
         triggerFit3Haptic(isFirst)
 
-        // 2. Hardware vibrator on phone (if enabled)
+        // 3. Hardware vibrator on phone (if enabled)
         if (vibratePhone) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                if (isFirst) {
-                    val timings = longArrayOf(0, (vibrationMs * 1.3).toLong(), 35, (vibrationMs * 0.9).toLong())
-                    val amplitudes = intArrayOf(0, 255, 0, 200)
-                    vibrator?.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
-                } else {
-                    vibrator?.vibrate(VibrationEffect.createOneShot(vibrationMs, VibrationEffect.DEFAULT_AMPLITUDE))
-                }
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator?.vibrate(if (isFirst) vibrationMs * 2 else vibrationMs)
-            }
+            triggerPhoneHaptic(isFirst)
         }
     }
 
@@ -469,6 +513,8 @@ class MetronomeService : Service() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "PulseFit Metrónomo Servicio",
@@ -476,8 +522,21 @@ class MetronomeService : Service() {
             ).apply {
                 description = "Sonido de metrónomo y sincronización con pulsera Galaxy Fit 3"
             }
-            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-            manager?.createNotificationChannel(channel)
+            manager.createNotificationChannel(channel)
+
+            // High-importance channel specifically to activate the vibration motor on Samsung Galaxy Fit 3 via Galaxy Wearable notification mirroring
+            val hapticChannel = NotificationChannel(
+                HAPTIC_CHANNEL_ID,
+                "PulseFit Vibración Pulsera Fit 3",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Canal prioritario para enviar pulsos de vibración a la pulsera Samsung Galaxy Fit 3"
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 180, 50, 180)
+                setSound(null, null)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            }
+            manager.createNotificationChannel(hapticChannel)
         }
     }
 
