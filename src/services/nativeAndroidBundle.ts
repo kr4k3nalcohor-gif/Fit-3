@@ -246,8 +246,11 @@ dependencies {
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
 
     <application
         android:allowBackup="true"
@@ -374,7 +377,9 @@ import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -434,6 +439,13 @@ class MainActivity : ComponentActivity() {
                         putExtra(MetronomeService.EXTRA_BPM, bpm)
                     }
                     startService(intent)
+                },
+                onTestVibration = {
+                    android.util.Log.i("MainActivity", "Sending test vibration to Galaxy Fit 3 and phone")
+                    val intent = Intent(this, MetronomeService::class.java).apply {
+                        action = MetronomeService.ACTION_TEST_VIBRATION
+                    }
+                    startService(intent)
                 }
             )
         }
@@ -444,14 +456,36 @@ class MainActivity : ComponentActivity() {
 fun PulseFitNativeApp(
     onStartService: (bpm: Int, beats: Int, vibrationMs: Long, vibratePhone: Boolean) -> Unit,
     onStopService: () -> Unit,
-    onUpdateBpm: (bpm: Int) -> Unit
+    onUpdateBpm: (bpm: Int) -> Unit,
+    onTestVibration: () -> Unit
 ) {
     val context = LocalContext.current
     var isPlaying by remember { mutableStateOf(MetronomeService.isServiceRunning) }
     var bpm by remember { mutableStateOf(MetronomeService.currentBpm) }
     var beats by remember { mutableStateOf(4) }
     var vibrationMs by remember { mutableStateOf(85L) }
-    var vibratePhone by remember { mutableStateOf(false) }
+    var vibratePhone by remember { mutableStateOf(true) }
+
+    // Request Bluetooth and Notification runtime permissions for Galaxy Fit 3
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        android.util.Log.i("MainActivity", "Permissions result: \$permissions")
+    }
+
+    LaunchedEffect(Unit) {
+        val perms = mutableListOf<String>()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            perms.add(android.Manifest.permission.BLUETOOTH_CONNECT)
+            perms.add(android.Manifest.permission.BLUETOOTH_SCAN)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            perms.add(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+        if (perms.isNotEmpty()) {
+            permissionLauncher.launch(perms.toTypedArray())
+        }
+    }
 
     DisposableEffect(Unit) {
         val receiver = object : BroadcastReceiver() {
@@ -489,7 +523,18 @@ fun PulseFitNativeApp(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Text("PulseFit", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("PulseFit", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Watch, contentDescription = "Galaxy Fit 3", tint = Color(0xFFFB7185), modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Fit 3 Sincronizado", color = Color(0xFF38BDF8), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
 
             Box(
                 contentAlignment = Alignment.Center,
@@ -497,38 +542,89 @@ fun PulseFitNativeApp(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("\$bpm", fontSize = 60.sp, fontWeight = FontWeight.Black, color = Color.White, fontFamily = FontFamily.Monospace)
-                    Text("BPM", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF38BDF8))
+                    Text("BPM · EN RITMO", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF38BDF8))
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Controlable ±5 desde Fit 3", fontSize = 10.sp, color = Color(0xFF94A3B8))
                 }
             }
 
-            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Wearable & Vibration Controls Card
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A))
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Watch, contentDescription = null, tint = Color(0xFFFB7185), modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text("Vibración Samsung Fit 3", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text("Vibración directa en tu muñeca", color = Color(0xFF38BDF8), fontSize = 10.sp)
+                                }
+                            }
+                            Button(
+                                onClick = onTestVibration,
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF22C55E)),
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                modifier = Modifier.height(34.dp)
+                            ) {
+                                Text("Probar", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFF1E293B))
+                                .clickable { vibratePhone = !vibratePhone }
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Vibrar también en el celular", color = Color.White, fontSize = 11.sp)
+                            Switch(checked = vibratePhone, onCheckedChange = { vibratePhone = it })
+                        }
+                    }
+                }
+
                 Button(
                     onClick = {
                         isPlaying = !isPlaying
                         if (isPlaying) onStartService(bpm, beats, vibrationMs, vibratePhone) else onStopService()
                     },
-                    modifier = Modifier.fillMaxWidth().height(66.dp),
-                    shape = RoundedCornerShape(18.dp),
+                    modifier = Modifier.fillMaxWidth().height(60.dp),
+                    shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = if (isPlaying) Color(0xFFE11D48) else Color(0xFF059669))
                 ) {
                     Icon(if (isPlaying) Icons.Default.Stop else Icons.Default.PlayArrow, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text(if (isPlaying) "DETENER" else "1. INICIAR RITMO (PLAY)", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(if (isPlaying) "DETENER" else "INICIAR RITMO (PLAY)", fontSize = 17.sp, fontWeight = FontWeight.Bold)
                 }
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF131B2E))
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        modifier = Modifier.fillMaxWidth().padding(14.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text("2. AJUSTE DE TIEMPO (±5 FIT 3)", color = Color(0xFF38BDF8), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            Text("\$bpm BPM", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold)
+                            Text("AJUSTE DE TIEMPO (±5 FIT 3)", color = Color(0xFF38BDF8), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("\$bpm BPM", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
                         }
                         Row {
                             IconButton(onClick = { bpm = (bpm - 5).coerceAtLeast(30); onUpdateBpm(bpm) }) {
@@ -538,24 +634,6 @@ fun PulseFitNativeApp(
                                 Icon(Icons.Default.Add, "+5", tint = Color.White)
                             }
                         }
-                    }
-                }
-
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF131B2E))
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text("3. AJUSTE DE COMPÁS", color = Color(0xFF34D399), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            Text("\$beats/4 TIEMPOS", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
-                        }
-                        Icon(Icons.Default.Tune, "Configurar", tint = Color(0xFF34D399))
                     }
                 }
             }
@@ -571,6 +649,7 @@ fun PulseFitNativeApp(
     `package com.pulsefit.metronome
 
 import android.app.*
+import android.bluetooth.*
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
@@ -582,10 +661,17 @@ import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
+import java.util.UUID
 
 class MetronomeService : Service() {
     private val CHANNEL_ID = "pulsefit_running_channel"
     private val NOTIF_ID = 1001
+
+    private val IAS_SERVICE_UUID = UUID.fromString("00001802-0000-1000-8000-00805f9b34fb")
+    private val ALERT_LEVEL_UUID = UUID.fromString("00002a06-0000-1000-8000-00805f9b34fb")
+
+    private var bluetoothGatt: BluetoothGatt? = null
+    private var alertCharacteristic: BluetoothGattCharacteristic? = null
 
     private var mediaSession: MediaSessionCompat? = null
     private var job: Job? = null
@@ -597,7 +683,7 @@ class MetronomeService : Service() {
     private var beatsPerMeasure = 4
     private var currentBeat = 0
     private var vibrationMs = 85L
-    private var vibratePhone = false
+    private var vibratePhone = true
 
     private var audioTrack: AudioTrack? = null
     private var accentPcm: ShortArray = ShortArray(0)
@@ -607,6 +693,7 @@ class MetronomeService : Service() {
         const val ACTION_START = "ACTION_START"
         const val ACTION_STOP = "ACTION_STOP"
         const val ACTION_SET_BPM = "ACTION_SET_BPM"
+        const val ACTION_TEST_VIBRATION = "ACTION_TEST_VIBRATION"
         const val ACTION_BPM_UPDATED = "com.pulsefit.metronome.BPM_UPDATED"
 
         const val EXTRA_BPM = "EXTRA_BPM"
@@ -625,6 +712,57 @@ class MetronomeService : Service() {
         initAudioEngine()
         initMediaSession()
         createNotificationChannel()
+        initBluetoothFit3()
+    }
+
+    private fun initBluetoothFit3() {
+        try {
+            val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+            val adapter = bluetoothManager?.adapter ?: return
+            if (!adapter.isEnabled) return
+
+            val pairedDevices: Set<BluetoothDevice>? = adapter.bondedDevices
+            val fitDevice = pairedDevices?.firstOrNull { device ->
+                val name = device.name ?: ""
+                name.contains("Fit 3", ignoreCase = true) ||
+                name.contains("Galaxy Fit", ignoreCase = true) ||
+                name.contains("Fit3", ignoreCase = true) ||
+                name.contains("Samsung", ignoreCase = true) ||
+                name.contains("Watch", ignoreCase = true) ||
+                name.contains("Band", ignoreCase = true)
+            } ?: pairedDevices?.firstOrNull()
+
+            if (fitDevice != null) {
+                bluetoothGatt?.close()
+                bluetoothGatt = fitDevice.connectGatt(this, false, object : BluetoothGattCallback() {
+                    override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
+                        if (newState == BluetoothProfile.STATE_CONNECTED) {
+                            gatt?.discoverServices()
+                        } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                            alertCharacteristic = null
+                        }
+                    }
+
+                    override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
+                        if (status == BluetoothGatt.GATT_SUCCESS && gatt != null) {
+                            val service = gatt.getService(IAS_SERVICE_UUID)
+                            alertCharacteristic = service?.getCharacteristic(ALERT_LEVEL_UUID)
+                            if (alertCharacteristic == null) {
+                                for (srv in gatt.services) {
+                                    val charac = srv.getCharacteristic(ALERT_LEVEL_UUID)
+                                    if (charac != null) {
+                                        alertCharacteristic = charac
+                                        break
+                                    }
+                                }
+                            }
+                        }
+                    }
+                })
+            }
+        } catch (bleException: Exception) {
+            android.util.Log.w("MetronomeService", "Bluetooth connection note", bleException)
+        }
     }
 
     private fun initVibrator() {
@@ -739,7 +877,7 @@ class MetronomeService : Service() {
                 currentBpm = bpm
                 beatsPerMeasure = intent.getIntExtra(EXTRA_BEATS, beatsPerMeasure)
                 vibrationMs = intent.getLongExtra(EXTRA_VIBRATION_MS, vibrationMs)
-                vibratePhone = intent.getBooleanExtra(EXTRA_VIBRATE_PHONE, false)
+                vibratePhone = intent.getBooleanExtra(EXTRA_VIBRATE_PHONE, true)
                 android.util.Log.i("MetronomeService", "ACTION_START: BPM=\$bpm, beats=\$beatsPerMeasure, vibratePhone=\$vibratePhone")
                 startMetronome()
             }
@@ -751,6 +889,16 @@ class MetronomeService : Service() {
                 val newBpm = intent.getIntExtra(EXTRA_BPM, bpm)
                 android.util.Log.d("MetronomeService", "ACTION_SET_BPM received: \$newBpm")
                 setBpm(newBpm)
+            }
+            ACTION_TEST_VIBRATION -> {
+                android.util.Log.i("MetronomeService", "ACTION_TEST_VIBRATION received: triggering test haptic pattern")
+                scope.launch {
+                    triggerHaptic(0)
+                    delay(200)
+                    triggerHaptic(1)
+                    delay(200)
+                    triggerHaptic(2)
+                }
             }
         }
         return START_STICKY
@@ -765,6 +913,7 @@ class MetronomeService : Service() {
         isPlaying = true
         isServiceRunning = true
         currentBeat = 0
+        updateNotification()
         updateMediaSession()
         startForeground(NOTIF_ID, buildNotification())
 
@@ -772,9 +921,7 @@ class MetronomeService : Service() {
             while (isActive && isPlaying) {
                 val intervalMs = (60_000.0 / bpm).toLong()
                 playBeatAudio(currentBeat == 0)
-                if (vibratePhone) {
-                    triggerHaptic(currentBeat)
-                }
+                triggerHaptic(currentBeat)
                 currentBeat = (currentBeat + 1) % beatsPerMeasure
                 updateMediaSession()
                 delay(intervalMs)
@@ -796,6 +943,7 @@ class MetronomeService : Service() {
         bpm = newBpm.coerceIn(30, 260)
         currentBpm = bpm
         updateMediaSession()
+        updateNotification()
 
         val broadcastIntent = Intent(ACTION_BPM_UPDATED).apply {
             putExtra(EXTRA_BPM, bpm)
@@ -804,18 +952,48 @@ class MetronomeService : Service() {
         sendBroadcast(broadcastIntent)
     }
 
-    private fun triggerHaptic(beat: Int) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (beat == 0) {
-                val timings = longArrayOf(0, (vibrationMs * 1.3).toLong(), 35, (vibrationMs * 0.9).toLong())
-                val amplitudes = intArrayOf(0, 255, 0, 200)
-                vibrator?.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
+    private fun triggerFit3Haptic(isFirst: Boolean) {
+        val gatt = bluetoothGatt ?: return
+        val characteristic = alertCharacteristic ?: return
+        val alertLevel = if (isFirst) byteArrayOf(0x02) else byteArrayOf(0x01)
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                gatt.writeCharacteristic(characteristic, alertLevel, BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE)
             } else {
-                vibrator?.vibrate(VibrationEffect.createOneShot(vibrationMs, VibrationEffect.DEFAULT_AMPLITUDE))
+                @Suppress("DEPRECATION")
+                characteristic.value = alertLevel
+                @Suppress("DEPRECATION")
+                gatt.writeCharacteristic(characteristic)
             }
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator?.vibrate(vibrationMs)
+            android.util.Log.d("MetronomeService", "Galaxy Fit 3 IAS vibration sent: isFirst=\$isFirst")
+        } catch (writeException: SecurityException) {
+            android.util.Log.w("MetronomeService", "SecurityException writing to Fit 3 alert", writeException)
+        } catch (writeException: Exception) {
+            android.util.Log.w("MetronomeService", "Error writing to Fit 3 alert", writeException)
+        }
+    }
+
+    private fun triggerHaptic(beat: Int) {
+        val isFirst = beat == 0
+
+        // 1. Send physical vibration to Samsung Galaxy Fit 3
+        triggerFit3Haptic(isFirst)
+
+        // 2. Hardware vibrator on phone (if enabled)
+        if (vibratePhone) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (isFirst) {
+                    val timings = longArrayOf(0, (vibrationMs * 1.3).toLong(), 35, (vibrationMs * 0.9).toLong())
+                    val amplitudes = intArrayOf(0, 255, 0, 200)
+                    vibrator?.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
+                } else {
+                    vibrator?.vibrate(VibrationEffect.createOneShot(vibrationMs, VibrationEffect.DEFAULT_AMPLITUDE))
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator?.vibrate(if (isFirst) vibrationMs * 2 else vibrationMs)
+            }
         }
     }
 
@@ -875,6 +1053,14 @@ class MetronomeService : Service() {
         }
         audioTrack = null
         mediaSession?.release()
+        try {
+            bluetoothGatt?.disconnect()
+            bluetoothGatt?.close()
+        } catch (gattCloseException: Exception) {
+            android.util.Log.w("MetronomeService", "Error releasing Bluetooth GATT", gattCloseException)
+        }
+        bluetoothGatt = null
+        alertCharacteristic = null
         android.util.Log.i("MetronomeService", "MetronomeService onDestroy completed")
     }
 }

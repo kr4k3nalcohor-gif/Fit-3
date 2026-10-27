@@ -34,12 +34,16 @@ El mosaico/tile **Controlador Multimedia** de la Galaxy Fit 3 se mapea directame
 
 Para garantizar la mejor experiencia durante entrenamientos y ensayos musicales:
 - **Sonido (Teléfono móvil)**:
-  - Generación de audio de baja latencia mediante `AudioTrack` PCM en tiempo real (44.1 kHz, 16-bit Mono).
+  - Generación de audio de ultra baja latencia mediante `AudioTrack` PCM en tiempo real (44.1 kHz, 16-bit Mono).
   - Tono agudo y acentuado en el pulso 1 de cada compás (1200 Hz).
   - Tono secundario en los pulsos intermedios (820 Hz).
-- **Vibración (Samsung Galaxy Fit 3)**:
-  - La pulsera vibra físicamente en la muñeca al ritmo del pulso mediante la retroalimentación de la sesión multimedia activa y Bluetooth.
-  - **Vibración del teléfono desactivada por defecto**: El teléfono **no** vibra en la mano o en la mesa para no generar ruidos parásitos ni distorsionar el sonido de los clics. *(Se puede habilitar de forma opcional si se requiere)*.
+- **Vibración Física (Samsung Galaxy Fit 3)**:
+  - La pulsera vibra físicamente en la muñeca en cada pulso mediante el servicio estándar Bluetooth SIG **Immediate Alert Service (IAS `0x1802` / `0x2A06`)**.
+  - Pulso 1 acentuado con nivel alto de alerta (`0x02`), pulsos intermedios con nivel medio (`0x01`).
+  - Requiere aceptar el permiso de Bluetooth en la app móvil (`BLUETOOTH_CONNECT`).
+  - Incluye botón **"Probar"** en la app para verificar la vibración en la pulsera al instante sin esperar a iniciar la sesión.
+- **Vibración del teléfono móvil**:
+  - Activada por defecto con interruptor en la pantalla principal para apagarla o encenderla según tu preferencia.
 
 ---
 

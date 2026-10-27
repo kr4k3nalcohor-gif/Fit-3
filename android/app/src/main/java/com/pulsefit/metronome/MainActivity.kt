@@ -8,7 +8,9 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -70,6 +72,13 @@ class MainActivity : ComponentActivity() {
                         putExtra(MetronomeService.EXTRA_BPM, bpm)
                     }
                     startService(intent)
+                },
+                onTestVibration = {
+                    Log.i("MainActivity", "Sending test vibration to Galaxy Fit 3 and phone")
+                    val intent = Intent(this, MetronomeService::class.java).apply {
+                        action = MetronomeService.ACTION_TEST_VIBRATION
+                    }
+                    startService(intent)
                 }
             )
         }
@@ -80,16 +89,38 @@ class MainActivity : ComponentActivity() {
 fun PulseFitNativeApp(
     onStartService: (bpm: Int, beats: Int, vibrationMs: Long, vibratePhone: Boolean) -> Unit,
     onStopService: () -> Unit,
-    onUpdateBpm: (bpm: Int) -> Unit
+    onUpdateBpm: (bpm: Int) -> Unit,
+    onTestVibration: () -> Unit
 ) {
     val context = LocalContext.current
     var isPlaying by remember { mutableStateOf(MetronomeService.isServiceRunning) }
     var bpm by remember { mutableStateOf(MetronomeService.currentBpm) }
     var beats by remember { mutableStateOf(4) }
     var vibrationMs by remember { mutableStateOf(85L) }
-    var vibratePhone by remember { mutableStateOf(false) } // Default: False (Fit 3 vibrates, NOT the phone!)
+    var vibratePhone by remember { mutableStateOf(true) } // Default: True for guaranteed physical haptic feedback
     var showTempoDialog by remember { mutableStateOf(false) }
     var showBeatsDialog by remember { mutableStateOf(false) }
+
+    // Request Bluetooth and Notification runtime permissions for Galaxy Fit 3
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        Log.i("MainActivity", "Permissions result: $permissions")
+    }
+
+    LaunchedEffect(Unit) {
+        val perms = mutableListOf<String>()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            perms.add(android.Manifest.permission.BLUETOOTH_CONNECT)
+            perms.add(android.Manifest.permission.BLUETOOTH_SCAN)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            perms.add(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+        if (perms.isNotEmpty()) {
+            permissionLauncher.launch(perms.toTypedArray())
+        }
+    }
 
     // Listen to broadcast updates from MetronomeService (e.g. when user changes BPM on Galaxy Fit 3 Media Controller!)
     DisposableEffect(Unit) {
@@ -194,34 +225,85 @@ fun PulseFitNativeApp(
                 }
             }
 
-            // Mode indicator banner
+            // Wearable & Vibration Controls Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A))
             ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.VolumeUp,
-                        contentDescription = null,
-                        tint = Color(0xFF34D399),
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Watch,
+                                contentDescription = null,
+                                tint = Color(0xFFFB7185),
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "Vibración Samsung Galaxy Fit 3",
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Vibración háptica directa en tu muñeca",
+                                    color = Color(0xFF38BDF8),
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+
+                        // Button to immediately test vibration on Galaxy Fit 3!
+                        Button(
+                            onClick = onTestVibration,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF22C55E)),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                            modifier = Modifier.height(34.dp)
+                        ) {
+                            Text(
+                                text = "Probar",
+                                color = Color.Black,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Phone vibration toggle
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFF1E293B))
+                            .clickable { vibratePhone = !vibratePhone }
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
                         Text(
-                            text = "Sonido en móvil · Vibración en Fit 3",
+                            text = "Vibrar también en el celular",
                             color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
+                            fontSize = 11.sp
                         )
-                        Text(
-                            text = "El teléfono suena como metrónomo. La pulsera vibra en la muñeca.",
-                            color = Color(0xFF94A3B8),
-                            fontSize = 10.sp
+                        Switch(
+                            checked = vibratePhone,
+                            onCheckedChange = { vibratePhone = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = Color(0xFF38BDF8),
+                                uncheckedThumbColor = Color(0xFF94A3B8),
+                                uncheckedTrackColor = Color(0xFF334155)
+                            )
                         )
                     }
                 }

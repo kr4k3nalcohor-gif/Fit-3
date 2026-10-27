@@ -5,6 +5,13 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothGatt
+import android.bluetooth.BluetoothGattCallback
+import android.bluetooth.BluetoothGattCharacteristic
+import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
@@ -26,12 +33,21 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 class MetronomeService : Service() {
 
     private val TAG = "MetronomeService"
     private val CHANNEL_ID = "pulsefit_running_channel"
     private val NOTIF_ID = 1001
+
+    // Bluetooth Immediate Alert Service (IAS) UUIDs for wearable vibration
+    private val IAS_SERVICE_UUID = UUID.fromString("00001802-0000-1000-8000-00805f9b34fb")
+    private val ALERT_LEVEL_UUID = UUID.fromString("00002a06-0000-1000-8000-00805f9b34fb")
+
+    private var bluetoothGatt: BluetoothGatt? = null
+    private var alertCharacteristic: BluetoothGattCharacteristic? = null
+    private var isBleConnected = false
 
     private var mediaSession: MediaSessionCompat? = null
     private var job: Job? = null
@@ -44,7 +60,7 @@ class MetronomeService : Service() {
     private var currentBeat = 0
     private var vibrationMs = 85L
     private var accentFirstBeat = true
-    private var vibratePhone = false // User requested: ONLY Fit 3 vibrates, NOT the phone!
+    private var vibratePhone = true // Default: Vibrate both phone and Fit 3 for reliable feedback
 
     // Audio generation for phone metronome sound
     private var audioTrack: AudioTrack? = null
@@ -57,6 +73,7 @@ class MetronomeService : Service() {
         const val ACTION_SET_BPM = "ACTION_SET_BPM"
         const val ACTION_SET_BEATS = "ACTION_SET_BEATS"
         const val ACTION_SET_VIBRATION = "ACTION_SET_VIBRATION"
+        const val ACTION_TEST_VIBRATION = "ACTION_TEST_VIBRATION"
         const val ACTION_BPM_UPDATED = "com.pulsefit.metronome.BPM_UPDATED"
 
         const val EXTRA_BPM = "EXTRA_BPM"
@@ -66,6 +83,7 @@ class MetronomeService : Service() {
 
         var currentBpm = 160
         var isServiceRunning = false
+        var isWearableConnected = false
     }
 
     override fun onCreate() {
@@ -75,6 +93,75 @@ class MetronomeService : Service() {
         initAudioEngine()
         initMediaSession()
         createNotificationChannel()
+        initBluetoothFit3()
+    }
+
+    private fun initBluetoothFit3() {
+        try {
+            val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+            val adapter = bluetoothManager?.adapter ?: return
+            if (!adapter.isEnabled) {
+                Log.w(TAG, "Bluetooth is not enabled on device")
+                return
+            }
+
+            val pairedDevices: Set<BluetoothDevice>? = adapter.bondedDevices
+            val fitDevice = pairedDevices?.firstOrNull { device ->
+                val name = device.name ?: ""
+                name.contains("Fit 3", ignoreCase = true) ||
+                name.contains("Galaxy Fit", ignoreCase = true) ||
+                name.contains("Fit3", ignoreCase = true) ||
+                name.contains("Samsung", ignoreCase = true) ||
+                name.contains("Watch", ignoreCase = true) ||
+                name.contains("Band", ignoreCase = true)
+            } ?: pairedDevices?.firstOrNull()
+
+            if (fitDevice != null) {
+                Log.i(TAG, "Connecting to paired wearable: ${fitDevice.name} (${fitDevice.address})")
+                bluetoothGatt?.close()
+                bluetoothGatt = fitDevice.connectGatt(this, false, object : BluetoothGattCallback() {
+                    override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
+                        if (newState == BluetoothProfile.STATE_CONNECTED) {
+                            Log.i(TAG, "Wearable GATT connected! Discovering services...")
+                            isBleConnected = true
+                            isWearableConnected = true
+                            gatt?.discoverServices()
+                        } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                            Log.i(TAG, "Wearable GATT disconnected")
+                            isBleConnected = false
+                            isWearableConnected = false
+                            alertCharacteristic = null
+                        }
+                    }
+
+                    override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
+                        if (status == BluetoothGatt.GATT_SUCCESS && gatt != null) {
+                            val service = gatt.getService(IAS_SERVICE_UUID)
+                            alertCharacteristic = service?.getCharacteristic(ALERT_LEVEL_UUID)
+                            if (alertCharacteristic != null) {
+                                Log.i(TAG, "SUCCESS: Found Immediate Alert Service on Galaxy Fit 3!")
+                            } else {
+                                Log.d(TAG, "Searching all services for alert characteristic...")
+                                for (srv in gatt.services) {
+                                    val charac = srv.getCharacteristic(ALERT_LEVEL_UUID)
+                                    if (charac != null) {
+                                        alertCharacteristic = charac
+                                        Log.i(TAG, "Alert characteristic found in service: ${srv.uuid}")
+                                        break
+                                    }
+                                }
+                            }
+                        }
+                    }
+                })
+            } else {
+                Log.w(TAG, "No paired Galaxy Fit 3 or wearable device found in bonded devices")
+            }
+        } catch (bleException: SecurityException) {
+            Log.w(TAG, "Bluetooth connect permission not granted", bleException)
+        } catch (bleException: Exception) {
+            Log.w(TAG, "Error connecting to Bluetooth wearable", bleException)
+        }
     }
 
     private fun initVibrator() {
@@ -211,6 +298,16 @@ class MetronomeService : Service() {
                 Log.d(TAG, "ACTION_SET_BPM received: $newBpm")
                 setBpm(newBpm)
             }
+            ACTION_TEST_VIBRATION -> {
+                Log.i(TAG, "ACTION_TEST_VIBRATION received: triggering test haptic pattern on Fit 3 and phone")
+                scope.launch {
+                    triggerHaptic(0)
+                    delay(200)
+                    triggerHaptic(1)
+                    delay(200)
+                    triggerHaptic(2)
+                }
+            }
         }
         return START_STICKY
     }
@@ -237,10 +334,8 @@ class MetronomeService : Service() {
                 val isAccent = currentBeat == 0
                 playBeatAudio(isAccent)
 
-                // 2. Only vibrate phone if explicitly requested (default: off)
-                if (vibratePhone) {
-                    triggerHaptic(currentBeat)
-                }
+                // 2. Physical wrist vibration on Galaxy Fit 3 + Phone vibrator
+                triggerHaptic(currentBeat)
 
                 currentBeat = (currentBeat + 1) % beatsPerMeasure
                 updateMediaSession()
@@ -276,19 +371,48 @@ class MetronomeService : Service() {
         sendBroadcast(broadcastIntent)
     }
 
+    private fun triggerFit3Haptic(isFirst: Boolean) {
+        val gatt = bluetoothGatt ?: return
+        val characteristic = alertCharacteristic ?: return
+        val alertLevel = if (isFirst) byteArrayOf(0x02) else byteArrayOf(0x01) // 2 = High Alert, 1 = Mild Alert
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                gatt.writeCharacteristic(characteristic, alertLevel, BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE)
+            } else {
+                @Suppress("DEPRECATION")
+                characteristic.value = alertLevel
+                @Suppress("DEPRECATION")
+                gatt.writeCharacteristic(characteristic)
+            }
+            Log.d(TAG, "Galaxy Fit 3 IAS vibration sent: isFirst=$isFirst")
+        } catch (writeException: SecurityException) {
+            Log.w(TAG, "SecurityException writing to Fit 3 alert characteristic", writeException)
+        } catch (writeException: Exception) {
+            Log.w(TAG, "Error writing to Fit 3 alert characteristic", writeException)
+        }
+    }
+
     private fun triggerHaptic(beat: Int) {
         val isFirst = beat == 0 && accentFirstBeat
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (isFirst) {
-                val timings = longArrayOf(0, (vibrationMs * 1.3).toLong(), 35, (vibrationMs * 0.9).toLong())
-                val amplitudes = intArrayOf(0, 255, 0, 200)
-                vibrator?.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
+
+        // 1. Send physical vibration to Samsung Galaxy Fit 3 via BLE Immediate Alert
+        triggerFit3Haptic(isFirst)
+
+        // 2. Hardware vibrator on phone (if enabled)
+        if (vibratePhone) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (isFirst) {
+                    val timings = longArrayOf(0, (vibrationMs * 1.3).toLong(), 35, (vibrationMs * 0.9).toLong())
+                    val amplitudes = intArrayOf(0, 255, 0, 200)
+                    vibrator?.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
+                } else {
+                    vibrator?.vibrate(VibrationEffect.createOneShot(vibrationMs, VibrationEffect.DEFAULT_AMPLITUDE))
+                }
             } else {
-                vibrator?.vibrate(VibrationEffect.createOneShot(vibrationMs, VibrationEffect.DEFAULT_AMPLITUDE))
+                @Suppress("DEPRECATION")
+                vibrator?.vibrate(if (isFirst) vibrationMs * 2 else vibrationMs)
             }
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator?.vibrate(if (isFirst) vibrationMs * 2 else vibrationMs)
         }
     }
 
@@ -371,6 +495,14 @@ class MetronomeService : Service() {
         }
         audioTrack = null
         mediaSession?.release()
+        try {
+            bluetoothGatt?.disconnect()
+            bluetoothGatt?.close()
+        } catch (gattCloseException: Exception) {
+            Log.w(TAG, "Error releasing Bluetooth GATT", gattCloseException)
+        }
+        bluetoothGatt = null
+        alertCharacteristic = null
         Log.i(TAG, "MetronomeService onDestroy completed")
     }
 }
