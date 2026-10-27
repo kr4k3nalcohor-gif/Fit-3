@@ -22,17 +22,17 @@ android {
     }
 
     signingConfigs {
-        val customKeystorePath = System.getenv("KEYSTORE_FILE") 
-            ?: (project.findProperty("KEYSTORE_FILE") as? String)
-        val keystoreFile = when {
-            customKeystorePath != null && file(customKeystorePath).exists() -> file(customKeystorePath)
-            file("${rootDir}/release.keystore").exists() -> file("${rootDir}/release.keystore")
-            file("${rootDir}/debug.keystore").exists() -> file("${rootDir}/debug.keystore")
-            else -> null
-        }
+        create("release") {
+            val customKeystorePath = System.getenv("KEYSTORE_FILE") 
+                ?: (project.findProperty("KEYSTORE_FILE") as? String)
+            val keystoreFile = when {
+                customKeystorePath != null && file(customKeystorePath).exists() -> file(customKeystorePath)
+                file("${rootDir}/release.keystore").exists() -> file("${rootDir}/release.keystore")
+                file("${rootDir}/debug.keystore").exists() -> file("${rootDir}/debug.keystore")
+                else -> null
+            }
 
-        if (keystoreFile != null) {
-            create("flexibleSigning") {
+            if (keystoreFile != null) {
                 storeFile = keystoreFile
                 storePassword = System.getenv("KEYSTORE_PASSWORD") 
                     ?: (project.findProperty("KEYSTORE_PASSWORD") as? String) 
@@ -43,6 +43,8 @@ android {
                 keyPassword = System.getenv("KEY_PASSWORD") 
                     ?: (project.findProperty("KEY_PASSWORD") as? String) 
                     ?: "android"
+            } else {
+                initWith(getByName("debug"))
             }
         }
     }
@@ -50,9 +52,7 @@ android {
     buildTypes {
         debug {
             isMinifyEnabled = false
-            if (signingConfigs.findByName("flexibleSigning") != null) {
-                signingConfig = signingConfigs.getByName("flexibleSigning")
-            }
+            signingConfig = signingConfigs.getByName("debug")
         }
         release {
             isMinifyEnabled = false
@@ -60,11 +60,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            if (signingConfigs.findByName("flexibleSigning") != null) {
-                signingConfig = signingConfigs.getByName("flexibleSigning")
-            } else {
-                signingConfig = signingConfigs.getByName("debug")
-            }
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 

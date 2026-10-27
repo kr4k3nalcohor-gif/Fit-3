@@ -34,15 +34,11 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
-
-      - name: Create debug keystore
-        working-directory: ./android
-        run: |
-          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+        with:
+          build-root-directory: ./android
 
       - name: Grant execute permission for gradlew
-        working-directory: ./android
-        run: chmod +x gradlew
+        run: chmod +x android/gradlew
 
       - name: Build Debug APK with Gradle
         working-directory: ./android
@@ -59,6 +55,7 @@ jobs:
       - name: Release APK
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
+        continue-on-error: true
         with:
           files: android/app/build/outputs/apk/**/*.apk
           tag_name: latest-apk
@@ -154,17 +151,17 @@ android {
     }
 
     signingConfigs {
-        val customKeystorePath = System.getenv("KEYSTORE_FILE") 
-            ?: (project.findProperty("KEYSTORE_FILE") as? String)
-        val keystoreFile = when {
-            customKeystorePath != null && file(customKeystorePath).exists() -> file(customKeystorePath)
-            file("\${rootDir}/release.keystore").exists() -> file("\${rootDir}/release.keystore")
-            file("\${rootDir}/debug.keystore").exists() -> file("\${rootDir}/debug.keystore")
-            else -> null
-        }
+        create("release") {
+            val customKeystorePath = System.getenv("KEYSTORE_FILE") 
+                ?: (project.findProperty("KEYSTORE_FILE") as? String)
+            val keystoreFile = when {
+                customKeystorePath != null && file(customKeystorePath).exists() -> file(customKeystorePath)
+                file("\${rootDir}/release.keystore").exists() -> file("\${rootDir}/release.keystore")
+                file("\${rootDir}/debug.keystore").exists() -> file("\${rootDir}/debug.keystore")
+                else -> null
+            }
 
-        if (keystoreFile != null) {
-            create("flexibleSigning") {
+            if (keystoreFile != null) {
                 storeFile = keystoreFile
                 storePassword = System.getenv("KEYSTORE_PASSWORD") 
                     ?: (project.findProperty("KEYSTORE_PASSWORD") as? String) 
@@ -175,6 +172,8 @@ android {
                 keyPassword = System.getenv("KEY_PASSWORD") 
                     ?: (project.findProperty("KEY_PASSWORD") as? String) 
                     ?: "android"
+            } else {
+                initWith(getByName("debug"))
             }
         }
     }
@@ -182,9 +181,7 @@ android {
     buildTypes {
         debug {
             isMinifyEnabled = false
-            if (signingConfigs.findByName("flexibleSigning") != null) {
-                signingConfig = signingConfigs.getByName("flexibleSigning")
-            }
+            signingConfig = signingConfigs.getByName("debug")
         }
         release {
             isMinifyEnabled = false
@@ -192,11 +189,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            if (signingConfigs.findByName("flexibleSigning") != null) {
-                signingConfig = signingConfigs.getByName("flexibleSigning")
-            } else {
-                signingConfig = signingConfigs.getByName("debug")
-            }
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
@@ -227,6 +220,16 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.media:media:1.7.0")
 }
+`
+  );
+
+  appFolder.file(
+    'proguard-rules.pro',
+    `# PulseFit Android ProGuard Rules
+-keep class com.pulsefit.metronome.** { *; }
+-keep class android.support.v4.media.** { *; }
+-keep class androidx.media.** { *; }
+-dontwarn android.support.v4.media.**
 `
   );
 
